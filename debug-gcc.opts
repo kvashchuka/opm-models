@@ -1,9 +1,10 @@
-# USE_CMAKE is quite a misnomer here: although eWoms and the other OPM
-# modules always use cmake, using dunecontrol for them currently
-# requires to use the autotools compatibility mode, i.e. building the
-# Dune modules using the Dune cmake build system is not yet
-# supported...
-USE_CMAKE=no
+# This enables parallel builds, one build process for each core of
+# your computer's processor. Note that this includes logical
+# ("hyperthreaded") cores. BE CAREFUL: You need to have enough RAM for
+# this, where "enough" currently means "about 2 Gb per logical core"!
+
+# NUM_CORES="$(grep "processor" /proc/cpuinfo | wc -l)"
+# export MAKE_FLAGS="-j$NUM_CORES"
 
 CXX_WARNING_OPTS=" \
     -Wall \
@@ -17,12 +18,14 @@ CXX_OPTS=" \
     -g \
     -DDEBUG=1"
 
-CONFIGURE_FLAGS="\
-  CC=\"gcc\" \
-  CXX=\"g++\" \
-  CXXFLAGS=\"$CXX_WARNING_OPTS $CXX_OPTS\" \
-  --disable-documentation \
-  --enable-fieldvector-size-is-method \
-  --enable-experimental-grid-extensions \
-  --disable-parallel \
-  --disable-mpiruntest"
+# arguments passed to the cmake command
+CMAKE_FLAGS=" \
+  -DCMAKE_C_COMPILER=\"gcc\" \
+  -DCMAKE_CXX_COMPILER=\"g++\" \
+  -DCMAKE_C_FLAGS=\"$CXX_WARNING_OPTS $CXX_OPTS\" \
+  -DCMAKE_CXX_FLAGS=\"$CXX_WARNING_OPTS $CXX_OPTS\" \
+  "
+
+# additional cmake flags which you may be interested in adding:
+#
+# -DBUILD_TESTING=ON \
