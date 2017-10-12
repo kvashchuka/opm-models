@@ -18,12 +18,15 @@ CXX_OPTS=" \
     -g \
     -DDEBUG=1"
 
-# arguments passed to the cmake command
+# arguments passed to the cmake command. note that the SIBLING_SEARCH
+# option is set to OFF because the paths to all directories are
+# explicitly specified when using dunecontrol
 CMAKE_FLAGS=" \
   -DCMAKE_C_COMPILER=\"gcc\" \
   -DCMAKE_CXX_COMPILER=\"g++\" \
   -DCMAKE_C_FLAGS=\"$CXX_WARNING_OPTS $CXX_OPTS\" \
   -DCMAKE_CXX_FLAGS=\"$CXX_WARNING_OPTS $CXX_OPTS\" \
+  -DSIBLING_SEARCH=OFF \
   "
 
 # additional cmake flags which you may be interested in adding:

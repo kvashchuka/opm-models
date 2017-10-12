@@ -6,6 +6,49 @@ project("ewoms" C CXX)
 
 cmake_minimum_required(VERSION 3.0)
 
+
+# Sibling build
+option(SIBLING_SEARCH "Search for other modules in sibling directories?" ON)
+if(SIBLING_SEARCH)
+  # guess the sibling dir
+  get_filename_component(_leaf_dir_name ${PROJECT_BINARY_DIR} NAME)
+  get_filename_component(_parent_full_dir ${PROJECT_BINARY_DIR} DIRECTORY)
+  get_filename_component(_parent_dir_name ${_parent_full_dir} NAME)
+  get_filename_component(_modules_dir ${_parent_full_dir} DIRECTORY)
+  foreach(MOD dune-common dune-geometry dune-grid dune-localfunctions dune-istl opm-common libecl opm-parser opm-grid opm-core opm-material)
+    # do not overwrite the location of a module if it was explicitly
+    # specified by the user
+    if(${MOD}_DIR)
+      continue()
+    endif()
+
+    #Try if <module-name>/<build-dir> is used
+    if(EXISTS ${_modules_dir}/${MOD}/${_leaf_dir_name}/${MOD}-config.cmake)
+      set(${MOD}_DIR ${_modules_dir}/${MOD}/${_leaf_dir_name})
+    else()
+
+      string(REPLACE ${PROJECT_NAME} ${MOD} _${MOD}_leaf ${_leaf_dir_name})
+      if(NOT _leaf_dir_name STREQUAL _${MOD}_leaf AND EXISTS ${_parent_full_dir}/${_${MOD}_leaf}/${MOD}-config.cmake)
+        # We are using build directories named <prefix><module-name><postfix>
+        set(${MOD}_DIR ${_parent_full_dir}/${_${MOD}_leaf})
+
+      elseif(EXISTS ${_parent_full_dir}/${MOD}-config.cmake)
+        # All modules are in a common build dir
+        set(${MOD}_DIR "${_parent_full_dir}/${MOD}")
+      endif()
+    endif()
+  endforeach()
+endif()
+
+if(dune-common_DIR AND NOT IS_DIRECTORY ${dune-common_DIR})
+  message(WARNING "Value ${dune-common_DIR} passed to variable"
+    " dune-common_DIR is not a directory")
+endif()
+if(opm-common_DIR AND NOT IS_DIRECTORY ${opm-common_DIR})
+  message(WARNING "Value ${opm-common_DIR} passed to variable"
+    " opm-common_DIR is not a directory")
+endif()
+
 # Set CMP0053 (how to handle escape sequences in strings) to the new
 # behavior to avoid a pretty annoying cmake warning if a library is
 # defined in the toplevel CMakeLists.txt. This should probably be
