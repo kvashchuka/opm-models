@@ -1,45 +1,58 @@
-#ifndef DUNE_FEM_LIMITER_HH
-#define DUNE_FEM_LIMITER_HH
+#ifndef EWOMS_RECONSTRUCTION_HH
+#define EWOMS_RECONSTRUCTION_HH
 
 #include <dune/fem/space/finitevolume.hh>
 #include <dune/fem/io/parameter.hh>
 
 #include "limiterutility.hh"
+#include "limitermodel.hh"
 
-namespace Dune
+namespace Ewoms
 {
-namespace Fem
-{
+//namespace Fem
+//{
 
   /**
    * \brief Limited reconstruction.
    *
    * \ingroup PassBased
    */
-  template <class Model, class DiscreteFunction>
+  template <class TypeTag> //Model, class DiscreteFunction>
   class LimitedReconstruction
   {
   public:
-    typedef DiscreteFunction  DiscreteFunctionType;
-    typedef typename DiscreteFunctionType :: DiscreteFunctionSpaceType
-      DiscreteFunctionSpaceType;
+//    typedef DiscreteFunction  DiscreteFunctionType;
+//    typedef typename DiscreteFunctionType :: DiscreteFunctionSpaceType
+//      DiscreteFunctionSpaceType;
+//
+//    typedef typename DiscreteFunctionSpaceType :: DomainType DomainType;
+//    typedef typename DiscreteFunctionSpaceType :: RangeType  RangeType;
 
-    typedef typename DiscreteFunctionSpaceType :: DomainType DomainType;
-    typedef typename DiscreteFunctionSpaceType :: RangeType  RangeType;
+      typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
+      typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPart;
+      typedef typename GET_PROP_TYPE(TypeTag, GridPartType ) GridPartType;
+      typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
+      enum { dimDomain = GridType::dimensionworld };
+      enum { dimRange  = PrimaryVariables::dimension };
 
-    typedef LimiterUtility< DiscreteFunctionSpaceType >      LimiterUtilityType;
+      typedef FieldVector<typename GridType::ctype, dimDomain> DomainType;
+      typedef FieldVector<RangeFieldType, dimRange> RangeType;
+
+    typedef LimiterUtility< TypeTag >      LimiterUtilityType;
     typedef typename LimiterUtilityType :: GradientType      GradientType;
     typedef typename LimiterUtilityType :: CheckType         CheckType;
     typedef typename LimiterUtilityType :: ComboSetType      ComboSetType;
     typedef typename LimiterUtilityType :: KeyType           KeyType;
 
+    typedef typename LimiterModel< TypeTag > Model;
     typedef typename Model :: Traits :: LimiterFunctionType  LimiterFunctionType;
 
-    typedef typename DiscreteFunctionSpaceType :: FunctionSpaceType  FunctionSpaceType;
-    typedef typename DiscreteFunctionSpaceType :: GridPartType       GridPartType;
-    typedef typename GridPartType :: GridType                        GridType;
+   // typedef typename DiscreteFunctionSpaceType :: FunctionSpaceType  FunctionSpaceType;
+   // typedef typename DiscreteFunctionSpaceType :: GridPartType       GridPartType;
+   // typedef typename GridPartType :: GridType                        GridType;
 
-    typedef typename DiscreteFunctionSpaceType :: EntityType         EntityType;
+   // typedef typename DiscreteFunctionSpaceType :: EntityType         EntityType;
+   typedef typename GridView::template Codim<0>::Entity EntityType;
     typedef typename EntityType :: Geometry                          Geometry;
 
     typedef typename LimiterUtilityType::MatrixStorage MatrixCacheEntry;
@@ -51,7 +64,7 @@ namespace Fem
     typedef CheckCartesian< GridPartType >  CheckCartesianType;
 
   public:
-    LimitedReconstruction( const Model& model, const DiscreteFunctionSpaceType& space )
+    LimitedReconstruction( TypeTag )
       : space_( space )
       , gridPart_( space_.gridPart() )
       , model_( model )
@@ -314,7 +327,7 @@ namespace Fem
     const bool cartesianGrid_;
   };
 
-} // end namespace Fem
+//} // end namespace Fem
 
 } // end namespace Dune
 

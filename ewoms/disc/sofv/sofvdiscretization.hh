@@ -41,6 +41,9 @@
 #if HAVE_DUNE_FEM
 #include <dune/fem/space/common/functionspace.hh>
 #include <dune/fem/space/finitevolume.hh>
+#include "reconstruction.hh"
+#include "limitermodel.hh"
+#include "limiterutility.hh"
 #endif
 
 namespace Ewoms {
@@ -91,6 +94,8 @@ private:
 public:
     typedef Dune::Fem::FiniteVolumeSpace< FunctionSpace, GridPart, 0 > type;
 };
+SET_BOOL_PROP(SofvDiscretization, higherOrder_, true);
+
 #endif
 
 //! Set the border list creator for to the one of an element based
@@ -133,6 +138,9 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
     typedef typename GET_PROP_TYPE(TypeTag, Simulator) Simulator;
 
+    typedef LimiterModel<TypeTag> LimiterModelType;
+
+
 public:
     SofvDiscretization(Simulator& simulator)
         : ParentType(simulator)
@@ -143,6 +151,20 @@ public:
      */
     static std::string discretizationName()
     { return "sofv"; }
+
+    /*!
+ * \brief Called by the update() method before it tries to
+ *        apply the newton method. This is primary a hook
+ *        which the actual model can overload.
+ */
+    void updateBegin()
+    {
+        if( higherOrder_ )
+        {
+            // compute linear reconstructions
+            reconstruction_.update( asImp_().solution(/*timeIdx=*/0) );
+        }
+    }
 
     /*!
      * \brief Returns the number of global degrees of freedom (DOFs) due to the grid
@@ -211,6 +233,8 @@ private:
     { return *static_cast<Implementation*>(this); }
     const Implementation& asImp_() const
     { return *static_cast<const Implementation*>(this); }
+    mutable ReconstructionType reconstruction_;
+    const bool higherOrder_;
 };
 } // namespace Ewoms
 

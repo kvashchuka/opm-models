@@ -31,6 +31,7 @@
 #define EWOMS_DARCY_FLUX_MODULE_HH
 
 #include "multiphasebaseproperties.hh"
+
 #include <ewoms/models/common/quantitycallbacks.hh>
 
 #include <opm/common/Valgrind.hpp>

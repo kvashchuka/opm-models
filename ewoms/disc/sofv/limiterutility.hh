@@ -1,5 +1,5 @@
-#ifndef DUNE_LIMITERUTILITY_HH
-#define DUNE_LIMITERUTILITY_HH
+#ifndef EWOMS_LIMITERUTILITY_HH
+#define EWOMS_LIMITERUTILITY_HH
 
 #include <vector>
 #include <type_traits>
@@ -30,28 +30,48 @@
 #include <dune/fem/misc/compatibility.hh>
 
 //*************************************************************
-namespace Dune
+namespace Ewoms
 {
-namespace Fem
-{
+//namespace Fem
+//{
 
-  template< class DiscreteFunctionSpace >
+  template< class TypeTag >
   struct LimiterUtility
   {
-    typedef DiscreteFunctionSpace DiscreteFunctionSpaceType ;
-    typedef typename DiscreteFunctionSpaceType :: FunctionSpaceType FunctionSpaceType;
-    typedef typename FunctionSpaceType :: DomainType      DomainType;
-    typedef typename FunctionSpaceType :: DomainFieldType DomainFieldType;
-    typedef typename FunctionSpaceType :: RangeType       RangeType;
-    typedef typename FunctionSpaceType :: RangeFieldType  RangeFieldType;
+//    typedef DiscreteFunctionSpace DiscreteFunctionSpaceType ;
+//    typedef typename DiscreteFunctionSpaceType :: FunctionSpaceType FunctionSpaceType;
+//    typedef typename FunctionSpaceType :: DomainType      DomainType;
+//    typedef typename FunctionSpaceType :: DomainFieldType DomainFieldType;
+//    typedef typename FunctionSpaceType :: RangeType       RangeType;
+//    typedef typename FunctionSpaceType :: RangeFieldType  RangeFieldType;
+//
+//    static const int dimRange  = FunctionSpaceType :: dimRange;
+//    static const int dimDomain = FunctionSpaceType :: dimDomain;
+      typedef double Field; //can be Scalar
+      typedef Field RangeFieldType;
+      typedef Field FieldType;
 
-    static const int dimRange  = FunctionSpaceType :: dimRange;
-    static const int dimDomain = FunctionSpaceType :: dimDomain;
+      typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
+      //?typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
+      typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPart;
+      typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
+      enum { dimDomain = GridType::dimensionworld };
+      enum { dimRange  = PrimaryVariables::dimension };
+      //? dimWorld = dimDomain? enum { dimWorld = GridView::dimensionworld };
 
-    typedef FieldVector< DomainType , dimRange > GradientType;
-    typedef FieldMatrix< DomainFieldType, dimDomain , dimDomain > MatrixType;
+      typedef FieldVector<typename GridType::ctype, dimDomain> DomainType;
+      typedef FieldVector<RangeFieldType, dimRange> RangeType;
 
-    static const int dimGrid = DiscreteFunctionSpaceType::GridType::dimension;
+      typedef Dune::FieldVector<Scalar, dimWorld> GradientType;
+      //  typedef Dune::FieldVector<Evaluation, dimWorld> EvalDimVector; this is a range gradient type, here we need domain gradient type
+      typedef Dune::FieldMatrix<Scalar, dimWorld, dimWorld> MatrixType;
+
+
+    //typedef FieldVector< DomainType , dimRange > GradientType;
+    //typedef FieldMatrix< DomainFieldType, dimDomain , dimDomain > MatrixType;
+
+   // static const int dimGrid = DiscreteFunctionSpaceType::GridType::dimension;
+      static const int dimGrid = GridType::dimension;
 
     typedef DGFEntityKey<int> KeyType;
     typedef std::vector<int> CheckType;
@@ -988,7 +1008,7 @@ namespace Fem
     }
   };
 
-} // end namespace Fem
+//} // end namespace Fem
 } // end namespace Dune
 
 #endif // DUNE_LIMITERUTILITY_HH
