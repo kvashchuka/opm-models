@@ -3,7 +3,7 @@
 
 #include <cmath>
 #include <dune/common/fvector.hh>
-#include <dune/fem/storage/vector.hh>
+#include <dune/fem/storage/subvector.hh>
 #include <dune/fem/io/parameter.hh>
 
 
@@ -32,10 +32,10 @@ public:
   enum { dimDomain = GridType::dimensionworld };
   enum { dimRange  = PrimaryVariables::dimension };
   enum { dimGradRange = dimRange * dimDomain };
-  typedef FieldVector<typename GridType::ctype, dimDomain> DomainType;
-  typedef FieldVector<typename GridType::ctype, dimDomain-1> FaceDomainType;
-  typedef FieldVector<RangeFieldType, dimRange> RangeType;
-  typedef FieldVector<RangeFieldType, dimGradRange> GradientType;
+  typedef Dune::FieldVector<typename GridType::ctype, dimDomain> DomainType;
+  typedef Dune::FieldVector<typename GridType::ctype, dimDomain-1> FaceDomainType;
+  typedef Dune::FieldVector<RangeFieldType, dimRange> RangeType;
+  typedef Dune::FieldVector<RangeFieldType, dimGradRange> GradientType;
   typedef typename GridPart::IntersectionIteratorType IntersectionIteratorType;
   typedef typename IntersectionIteratorType :: Intersection IntersectionType;
   typedef typename GridType::template Codim<0>::Entity EntityType;
@@ -63,7 +63,7 @@ public:
   typedef typename Traits::RangeType RangeType;
   typedef typename Traits::DomainType DomainType;
   typedef typename Traits::FaceDomainType FaceDomainType;
-    typedef typename Traits::GridPartType GridPartType;
+    typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
   typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
   typedef typename IntersectionIteratorType :: Intersection IntersectionType;
   typedef typename Traits::EntityType EntityType;

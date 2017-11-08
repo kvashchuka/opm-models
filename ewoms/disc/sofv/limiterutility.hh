@@ -6,6 +6,7 @@
 
 #include <dune/common/fvector.hh>
 #include <dune/common/timer.hh>
+#include <dune/common/exceptions.hh>
 
 #include <dune/grid/common/grid.hh>
 #include <dune/grid/io/file/dgfparser/entitykey.hh>
@@ -47,24 +48,28 @@ namespace Ewoms
 //
 //    static const int dimRange  = FunctionSpaceType :: dimRange;
 //    static const int dimDomain = FunctionSpaceType :: dimDomain;
+      typedef typename GET_PROP_TYPE(TypeTag, Scalar) DomainFieldType; //should be Scalar
       typedef double Field; //can be Scalar
       typedef Field RangeFieldType;
       typedef Field FieldType;
 
       typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
-      //?typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
+      typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
       typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPart;
       typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
       enum { dimDomain = GridType::dimensionworld };
       enum { dimRange  = PrimaryVariables::dimension };
       //? dimWorld = dimDomain? enum { dimWorld = GridView::dimensionworld };
 
-      typedef FieldVector<typename GridType::ctype, dimDomain> DomainType;
-      typedef FieldVector<RangeFieldType, dimRange> RangeType;
+      typedef Dune::FieldVector<typename GridType::ctype, dimDomain> DomainType;
+      typedef Dune::FieldVector<RangeFieldType, dimRange> RangeType;
 
-      typedef Dune::FieldVector<Scalar, dimWorld> GradientType;
+      typedef Dune::FieldVector<DomainFieldType, dimDomain> GradientType;
       //  typedef Dune::FieldVector<Evaluation, dimWorld> EvalDimVector; this is a range gradient type, here we need domain gradient type
-      typedef Dune::FieldMatrix<Scalar, dimWorld, dimWorld> MatrixType;
+      typedef Dune::FieldMatrix<DomainFieldType, dimDomain, dimDomain> MatrixType;
+
+      typedef typename GridView::template Codim<0>::Entity EntityType;
+      typedef typename EntityType :: GeometryType GeometryType;
 
 
     //typedef FieldVector< DomainType , dimRange > GradientType;
@@ -73,7 +78,7 @@ namespace Ewoms
    // static const int dimGrid = DiscreteFunctionSpaceType::GridType::dimension;
       static const int dimGrid = GridType::dimension;
 
-    typedef DGFEntityKey<int> KeyType;
+    typedef Dune::DGFEntityKey<int> KeyType;
     typedef std::vector<int> CheckType;
     typedef std::pair< KeyType, CheckType > VectorCompType;
     typedef std::set< VectorCompType > ComboSetType;
@@ -175,7 +180,7 @@ namespace Ewoms
     static void getMaxFunction(const std::vector< GradientType >& gradients,
                                GradientType& maxGradient)
     {
-      static const int dimRange = FunctionSpaceType :: dimRange ;
+        enum { dimRange  = PrimaryVariables::dimension };
 
       const size_t numFunctions = gradients.size();
 
@@ -337,7 +342,7 @@ namespace Ewoms
       typedef Entity EntityType;
 
       //! type of cartesian grid checker
-      typedef CheckCartesian< GridPart >  CheckCartesianType;
+      typedef Dune::Fem::CheckCartesian< GridPart >  CheckCartesianType;
 
       // get local references
       std::vector< DomainType >& barys  = baryCenters;
@@ -463,9 +468,9 @@ namespace Ewoms
     template<int dimension,int dimensionworld = dimension, class DomainFieldType = double>
     struct MatrixAssemblerForLinearReconstruction
     {
-      typedef DGFEntityKey<int> KeyType;
-      typedef FieldMatrix< DomainFieldType, dimensionworld , dimensionworld > MatrixType;
-      typedef FieldVector< DomainFieldType , dimensionworld > DomainType;
+      typedef Dune::DGFEntityKey<int> KeyType;
+      typedef Dune::FieldMatrix< DomainFieldType, dimensionworld , dimensionworld > MatrixType;
+      typedef Dune::FieldVector< DomainFieldType , dimensionworld > DomainType;
 
       static inline
       void assembleMatrix(const KeyType& v,
@@ -485,9 +490,9 @@ namespace Ewoms
     template<class DomainFieldType>
     struct MatrixAssemblerForLinearReconstruction<1, 2, DomainFieldType>
     {
-      typedef DGFEntityKey<int> KeyType;
-      typedef FieldMatrix< DomainFieldType, 2 , 2 > MatrixType;
-      typedef FieldVector< DomainFieldType , 2 > DomainType;
+      typedef Dune::DGFEntityKey<int> KeyType;
+      typedef Dune::FieldMatrix< DomainFieldType, 2 , 2 > MatrixType;
+      typedef Dune::FieldVector< DomainFieldType , 2 > DomainType;
 
       static inline
       void assembleMatrix(const KeyType& v,
@@ -510,9 +515,9 @@ namespace Ewoms
     template<class DomainFieldType>
     struct MatrixAssemblerForLinearReconstruction<2, 3, DomainFieldType>
     {
-      typedef DGFEntityKey<int> KeyType;
-      typedef FieldMatrix< DomainFieldType, 3 , 3 > MatrixType;
-      typedef FieldVector< DomainFieldType , 3 > DomainType;
+      typedef Dune::DGFEntityKey<int> KeyType;
+      typedef Dune::FieldMatrix< DomainFieldType, 3 , 3 > MatrixType;
+      typedef Dune::FieldVector< DomainFieldType , 3 > DomainType;
 
       static inline
       void assembleMatrix(const KeyType& v,
@@ -564,7 +569,7 @@ namespace Ewoms
           MatrixAssemblerForLinearReconstruction<dimGrid,dimDomain, DomainFieldType>
             :: assembleMatrix(v, barys, matrix);
           // invert matrix
-          RangeFieldType det = FMatrixHelp :: invertMatrix( matrix, inverse_ );
+          RangeFieldType det = Dune :: FMatrixHelp :: invertMatrix( matrix, inverse_ );
           if( std::abs( det ) > MatrixIF :: detEps_ )
           {
             inverseCalculated_ = true ;
@@ -619,8 +624,8 @@ namespace Ewoms
       // this should make the linear system solvable
 
       // need new matrix type containing one row more
-      typedef FieldMatrix<DomainFieldType, newDim , dimDomain> NewMatrixType;
-      typedef FieldVector<DomainFieldType, newDim > NewVectorType;
+      typedef Dune::FieldMatrix<DomainFieldType, newDim , dimDomain> NewMatrixType;
+      typedef Dune::FieldVector<DomainFieldType, newDim > NewVectorType;
 
       MatrixType inverse_ ;
       // new matrix
@@ -650,7 +655,7 @@ namespace Ewoms
           multiply_AT_A(A_, matrix);
 
             // invert matrix
-          RangeFieldType det = FMatrixHelp :: invertMatrix(matrix, inverse_ );
+          RangeFieldType det = Dune :: FMatrixHelp :: invertMatrix(matrix, inverse_ );
 
           if( std::abs( det ) > MatrixIF :: detEps_ )
           {
@@ -845,8 +850,9 @@ namespace Ewoms
           // matrix should be regular now
           if( checkIt == checkEnd )
           {
+            //TODO unccomment this check!
             // should work for 1 or 2 otherwise error
-            DUNE_THROW(InvalidStateException,"Check vector has no entries!");
+            //DUNE_THROW(InvalidStateException,"Check vector has no entries!");
           }
 
           CheckType checkNums ( check );
@@ -887,7 +893,7 @@ namespace Ewoms
   };
 
 
-  inline std::ostream& operator << (std::ostream& out, const DGFEntityKey<int>& key )
+  inline std::ostream& operator << (std::ostream& out, const Dune::DGFEntityKey<int>& key )
   {
     out << "(";
     for(int i=0; i<key.size(); ++i )
@@ -908,7 +914,8 @@ namespace Ewoms
     static double getEpsilon()
     {
       // default value is 1e-8
-      return Parameter::getValue("femdg.limiter.limiteps", double(1e-8) );
+     // return Parameter::getValue("femdg.limiter.limiteps", double(1e-8) );
+      return double(1e-8);
     }
 
     //! return epsilon for limiting
@@ -917,7 +924,8 @@ namespace Ewoms
   protected:
     void printInfo(const std::string& name ) const
     {
-      if( Parameter::verbose() )
+      //TODO what with parameter file in ewoms? what would be the substitute?
+      if( /*Parameter::verbose()*/ true )
       {
         std::cout << "LimiterFunction: " << name << " with limitEps = " << limitEps_ << std::endl;
       }

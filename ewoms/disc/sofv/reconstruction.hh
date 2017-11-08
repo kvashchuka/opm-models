@@ -27,16 +27,21 @@ namespace Ewoms
 //
 //    typedef typename DiscreteFunctionSpaceType :: DomainType DomainType;
 //    typedef typename DiscreteFunctionSpaceType :: RangeType  RangeType;
-
       typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
-      typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPart;
-      typedef typename GET_PROP_TYPE(TypeTag, GridPartType ) GridPartType;
+      typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
+      typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
+      //typedef typename Dune::Fem::BasicGridFunctionAdapter::GridPartType GridPartType;
       typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
       enum { dimDomain = GridType::dimensionworld };
       enum { dimRange  = PrimaryVariables::dimension };
 
-      typedef FieldVector<typename GridType::ctype, dimDomain> DomainType;
-      typedef FieldVector<RangeFieldType, dimRange> RangeType;
+      typedef typename GET_PROP_TYPE(TypeTag, Scalar) DomainFieldType; //should be Scalar
+      typedef double Field; //can be Scalar
+      typedef Field RangeFieldType;
+      typedef Field FieldType;
+
+      typedef Dune::FieldVector<typename GridType::ctype, dimDomain> DomainType;
+      typedef Dune::FieldVector<RangeFieldType, dimRange> RangeType;
 
     typedef LimiterUtility< TypeTag >      LimiterUtilityType;
     typedef typename LimiterUtilityType :: GradientType      GradientType;
