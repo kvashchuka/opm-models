@@ -6,7 +6,7 @@ project("ewoms" C CXX)
 
 cmake_minimum_required(VERSION 3.0)
 
-
+set(CMAKE_CXX_FLAGS "-Wfatal-errors")
 # Sibling build
 option(SIBLING_SEARCH "Search for other modules in sibling directories?" ON)
 if(SIBLING_SEARCH)
@@ -15,7 +15,7 @@ if(SIBLING_SEARCH)
   get_filename_component(_parent_full_dir ${PROJECT_BINARY_DIR} DIRECTORY)
   get_filename_component(_parent_dir_name ${_parent_full_dir} NAME)
   get_filename_component(_modules_dir ${_parent_full_dir} DIRECTORY)
-  foreach(MOD dune-common dune-geometry dune-grid dune-localfunctions dune-istl opm-common libecl opm-parser opm-grid opm-core opm-material)
+  foreach(MOD dune-common dune-geometry dune-grid dune-localfunctions dune-istl dune-fem opm-common libecl opm-parser opm-grid opm-core opm-material)
     # do not overwrite the location of a module if it was explicitly
     # specified by the user
     if(${MOD}_DIR)

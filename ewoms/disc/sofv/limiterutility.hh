@@ -10,6 +10,7 @@
 
 #include <dune/grid/common/grid.hh>
 #include <dune/grid/io/file/dgfparser/entitykey.hh>
+#include "dune/grid/common/entity.hh"
 
 #include <dune/fem/gridpart/common/capabilities.hh>
 #include <dune/fem/io/parameter.hh>
@@ -41,16 +42,12 @@ namespace Ewoms
   {
 //    typedef DiscreteFunctionSpace DiscreteFunctionSpaceType ;
 //    typedef typename DiscreteFunctionSpaceType :: FunctionSpaceType FunctionSpaceType;
-//    typedef typename FunctionSpaceType :: DomainType      DomainType;
-//    typedef typename FunctionSpaceType :: DomainFieldType DomainFieldType;
-//    typedef typename FunctionSpaceType :: RangeType       RangeType;
-//    typedef typename FunctionSpaceType :: RangeFieldType  RangeFieldType;
 //
 //    static const int dimRange  = FunctionSpaceType :: dimRange;
 //    static const int dimDomain = FunctionSpaceType :: dimDomain;
-      typedef typename GET_PROP_TYPE(TypeTag, Scalar) DomainFieldType; //should be Scalar
-      typedef double Field; //can be Scalar
-      typedef Field RangeFieldType;
+      typedef typename GET_PROP_TYPE(TypeTag, Scalar) Scalar; //should be Scalar
+      typedef Scalar Field; //can be Scalar
+      //typedef Field RangeFieldType;
       typedef Field FieldType;
 
       typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
@@ -61,15 +58,18 @@ namespace Ewoms
       enum { dimRange  = PrimaryVariables::dimension };
       //? dimWorld = dimDomain? enum { dimWorld = GridView::dimensionworld };
 
-      typedef Dune::FieldVector<typename GridType::ctype, dimDomain> DomainType;
-      typedef Dune::FieldVector<RangeFieldType, dimRange> RangeType;
+      typedef Dune::Fem::FunctionSpace<Scalar, Scalar, dimDomain, dimRange> FunctionSpaceType;
+      typedef typename FunctionSpaceType :: DomainType      DomainType;
+    typedef typename FunctionSpaceType :: DomainFieldType DomainFieldType;
+    typedef typename FunctionSpaceType :: RangeType       RangeType;
+    typedef typename FunctionSpaceType :: RangeFieldType  RangeFieldType;
 
-      typedef Dune::FieldVector<DomainFieldType, dimDomain> GradientType;
+      typedef Dune::FieldVector<DomainType, dimRange> GradientType;
       //  typedef Dune::FieldVector<Evaluation, dimWorld> EvalDimVector; this is a range gradient type, here we need domain gradient type
       typedef Dune::FieldMatrix<DomainFieldType, dimDomain, dimDomain> MatrixType;
 
       typedef typename GridView::template Codim<0>::Entity EntityType;
-      typedef typename EntityType :: GeometryType GeometryType;
+      typedef typename EntityType :: Geometry Geometry;
 
 
     //typedef FieldVector< DomainType , dimRange > GradientType;
@@ -139,7 +139,7 @@ namespace Ewoms
 
             // evaluate values for limiter function
             const DomainFieldType d = nbVals[ k ][ r ];
-            const DomainFieldType g = D * barys[ k ];
+            const DomainFieldType g = (D * barys[ k ]);
 
             const DomainFieldType length2 =  barys[ k ].two_norm2();
 
@@ -759,7 +759,7 @@ namespace Ewoms
     // get linear function from reconstruction of the average values
     template <class MatrixCacheType>
     static void calculateLinearFunctions(const ComboSetType& comboSet,
-                                         const GeometryType& geomType,
+                                         //const GeometryType& geomType,
                                          const Flags& flags,
                                          const std::vector< DomainType >& baryCenters,
                                          const std::vector< RangeType  >& neighborValues,

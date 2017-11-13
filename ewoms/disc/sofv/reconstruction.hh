@@ -30,6 +30,8 @@ namespace Ewoms
       typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
       typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
       typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
+      typedef typename GET_PROP_TYPE(TypeTag, SolutionVector) SolutionVector;
+      typedef typename GET_PROP_TYPE(TypeTag, DofMapper) DofMapper;
       //typedef typename Dune::Fem::BasicGridFunctionAdapter::GridPartType GridPartType;
       typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
       enum { dimDomain = GridType::dimensionworld };
@@ -49,7 +51,7 @@ namespace Ewoms
     typedef typename LimiterUtilityType :: ComboSetType      ComboSetType;
     typedef typename LimiterUtilityType :: KeyType           KeyType;
 
-    typedef typename LimiterModel< TypeTag > Model;
+    typedef LimiterModel< TypeTag > Model;
     typedef typename Model :: Traits :: LimiterFunctionType  LimiterFunctionType;
 
    // typedef typename DiscreteFunctionSpaceType :: FunctionSpaceType  FunctionSpaceType;
@@ -58,21 +60,22 @@ namespace Ewoms
 
    // typedef typename DiscreteFunctionSpaceType :: EntityType         EntityType;
    typedef typename GridView::template Codim<0>::Entity EntityType;
-    typedef typename EntityType :: Geometry                          Geometry;
+    typedef typename EntityType :: Geometry   Geometry;
+      //typedef typename EntityType :: GeometryType GeometryType;
 
     typedef typename LimiterUtilityType::MatrixStorage MatrixCacheEntry;
     typedef std::map< KeyType, MatrixCacheEntry > MatrixCacheType;
 
-    static const bool StructuredGrid     = GridPartCapabilities::isCartesian< GridPartType >::v;
+    static const bool StructuredGrid     = Dune::Fem::GridPartCapabilities::isCartesian< GridPartType >::v;
 
     //! type of cartesian grid checker
-    typedef CheckCartesian< GridPartType >  CheckCartesianType;
+    typedef Dune::Fem::CheckCartesian< GridPartType >  CheckCartesianType;
 
   public:
-    LimitedReconstruction( TypeTag )
-      : space_( space )
-      , gridPart_( space_.gridPart() )
-      , model_( model )
+    LimitedReconstruction( const GridPartType &gridPart, const Model& limiterModel, const DofMapper& dofMapper)
+      : //space_( space )
+        gridPart_( gridPart )
+      , model_( limiterModel )
       , limiterFunction_()
       , conformingComboSet_()
       , comboSet_()
@@ -81,7 +84,7 @@ namespace Ewoms
     {}
 
     //! calculate internal reconstruction based on mean values of U
-    void update( const DiscreteFunctionType& U )
+    void update( const SolutionVector & U, const DofMapper& dofMapper )
     {
       const size_t size = gridPart_.indexSet().size( 0 ) ;
       // resize gradient vector
@@ -91,7 +94,7 @@ namespace Ewoms
       const auto end = gridPart_.template end< 0, Dune::Interior_Partition >();
       for( auto it = gridPart_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
       {
-        applyLocal( *it, U );
+        applyLocal( *it, U, dofMapper );
       }
     }
 
@@ -135,19 +138,22 @@ namespace Ewoms
     };
 
     struct EvalAverage {
-      static const int dimRange = DiscreteFunctionSpaceType::dimRange;
-      const DiscreteFunctionType& U_;
-      typedef typename DiscreteFunctionType :: LocalFunctionType LocalFunctionType;
-      EvalAverage( const DiscreteFunctionType& U )
+      enum { dimRange  = PrimaryVariables::dimension };
+      const SolutionVector& U_;
+      const DofMapper dofMapper_;
+     // typedef typename SolutionVector :: LocalFunctionType LocalFunctionType;
+      EvalAverage( const SolutionVector & U, const DofMapper& dofMapper )
         : U_( U )
+          , dofMapper_ (dofMapper)
       {}
 
       bool evaluate( const EntityType& entity, RangeType& value ) const
       {
-        const LocalFunctionType& uEn = U_.localFunction( entity );
+        //const LocalFunctionType& uEn = U_.localFunction( entity );
+        unsigned dofIdx = dofMapper_.index(entity);
         for( int i=0; i<dimRange; ++i )
         {
-          value[ i ] = uEn[ i ];
+          value[ i ] = U_[ dofIdx][i];
         }
         return true;
       }
@@ -166,7 +172,7 @@ namespace Ewoms
 
     class LocalFunction
     {
-      static const int dimRange = DiscreteFunctionSpaceType::dimRange;
+        enum { dimRange  = PrimaryVariables::dimension };
       const Geometry       geometry_;
       const DomainType     center_;
       const RangeType&     value_;
@@ -185,7 +191,7 @@ namespace Ewoms
       void evaluate( const LocalPoint& local, RangeType& value ) const
       {
         // compute point of evaluation
-        DomainType x = geometry_.global( Fem::coordinate( local ) );
+        DomainType x = geometry_.global( Dune::Fem::coordinate( local ) );
         evaluateGlobal( x, value );
       }
 
@@ -208,18 +214,19 @@ namespace Ewoms
     };
 
 
-    void applyLocal( const EntityType& entity, const DiscreteFunctionType& U )
+    void applyLocal( const EntityType& entity, const SolutionVector & U, const DofMapper & dofMapper)
     {
       // helper class for evaluation of average value of discrete function
-      EvalAverage average( U );
+      EvalAverage average( U, dofMapper );
 
-      const unsigned int entityIndex = U.space().gridPart().indexSet().index( entity );
+     // const unsigned int entityIndex = U.space().gridPart().indexSet().index( entity );
+      unsigned entityIndex = dofMapper.index(entity); //dofIdx usually
 
       // get geometry
       const Geometry& geo = entity.geometry();
 
       // cache geometry type
-      const GeometryType geomType = geo.type();
+     // const GeometryType geomType = geo.type();
 
       // get bary center of element
       const DomainType entityCenter = geo.center();
@@ -241,8 +248,9 @@ namespace Ewoms
       //visited_[ entityIndex ] = true ;
 
       // create combination set
+      //TODO multipleGeometryTypes uses space_, which we don't have. Make sure to check geometry types in some other way
       const ComboSetType& comboSet = LimiterUtilityType::
-        setupComboSet( nbVals_.size(), flags.nonConforming, space_.multipleGeometryTypes(),
+        setupComboSet( nbVals_.size(), flags.nonConforming, /*space_.multipleGeometryTypes()*/ true,
                        conformingComboSet_, comboSet_ );
 
       // reset values
@@ -255,7 +263,7 @@ namespace Ewoms
       MatrixCacheType& matrixCache = matrixCacheVec_[ matrixCacheLevel ];
 
       // calculate linear functions, stored in localGradients_ and comboVec_
-      LimiterUtilityType::calculateLinearFunctions( comboSet, geomType, flags,
+      LimiterUtilityType::calculateLinearFunctions( comboSet, /*geomType,*/ flags,
                                 barys_, nbVals_,
                                 matrixCache,
                                 localGradients_,
@@ -310,7 +318,7 @@ namespace Ewoms
       return true;
     }
 
-    const DiscreteFunctionSpaceType& space_;
+   // const DiscreteFunctionSpaceType& space_;
     const GridPartType& gridPart_;
     const Model& model_;
 

@@ -55,8 +55,7 @@ class LimiterModel
 public:
   //typedef Problem ProblemType;
   typedef LimiterModelTraits< TypeTag > Traits;
-  enum { dimDomain = Traits::dimensionworld };
-  enum { dimGrid = Traits::dimension };
+  enum { dimDomain = Traits::dimDomain };
   enum { dimRange = Traits :: dimRange };
   typedef typename Traits::FieldType FieldType;
   typedef typename Traits::GridType GridType;

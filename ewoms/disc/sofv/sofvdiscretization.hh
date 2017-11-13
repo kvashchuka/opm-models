@@ -94,9 +94,12 @@ private:
 public:
     typedef Dune::Fem::FiniteVolumeSpace< FunctionSpace, GridPart, 0 > type;
 };
-SET_BOOL_PROP(SofvDiscretization, higherOrder_, true);
-
+        //SET_BOOL_PROP(SofvDiscretization, higherOrder_, true);
+        //TODO Maybe put it into property system
+        const bool higherOrder_ = true;
 #endif
+
+
 
 //! Set the border list creator for to the one of an element based
 //! method
@@ -139,11 +142,14 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef typename GET_PROP_TYPE(TypeTag, Simulator) Simulator;
 
     typedef LimiterModel<TypeTag> LimiterModelType;
+    typedef LimitedReconstruction< TypeTag > ReconstructionType;
 
 
 public:
     SofvDiscretization(Simulator& simulator)
-        : ParentType(simulator)
+        : ParentType(simulator),
+          limiterModel_(),
+          reconstruction_(simulator.gridManager().gridPart(), limiterModel_, dofMapper())
     { }
 
     /*!
@@ -162,7 +168,7 @@ public:
         if( higherOrder_ )
         {
             // compute linear reconstructions
-            reconstruction_.update( asImp_().solution(/*timeIdx=*/0) );
+            reconstruction_.update( asImp_().solution(/*timeIdx=*/0), dofMapper() );
         }
     }
 
@@ -234,7 +240,8 @@ private:
     const Implementation& asImp_() const
     { return *static_cast<const Implementation*>(this); }
     mutable ReconstructionType reconstruction_;
-    const bool higherOrder_;
+    LimiterModelType limiterModel_;
+    const bool higherOrder_ = true;
 };
 } // namespace Ewoms
 
