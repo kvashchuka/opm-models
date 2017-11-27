@@ -71,6 +71,9 @@ SET_TYPE_PROP(LensBaseProblem, Problem, Ewoms::LensProblem<TypeTag>);
 // Use Dune-grid's YaspGrid
 SET_TYPE_PROP(LensBaseProblem, Grid, Dune::YaspGrid<2>);
 
+// The default DGF file to load
+SET_STRING_PROP(LensBaseProblem, GridFile, "../tests/data/outflow.dgf");
+
 // Set the wetting phase
 SET_PROP(LensBaseProblem, WettingPhase)
 {
@@ -120,22 +123,22 @@ SET_BOOL_PROP(LensBaseProblem, NewtonWriteConvergence, false);
 SET_INT_PROP(LensBaseProblem, NumericDifferenceMethod, +1);
 
 // Enable gravity
-SET_BOOL_PROP(LensBaseProblem, EnableGravity, true);
+SET_BOOL_PROP(LensBaseProblem, EnableGravity, false);
 
 // define the properties specific for the lens problem
-SET_SCALAR_PROP(LensBaseProblem, LensLowerLeftX, 1.0);
-SET_SCALAR_PROP(LensBaseProblem, LensLowerLeftY, 2.0);
+SET_SCALAR_PROP(LensBaseProblem, LensLowerLeftX, 0.0);
+SET_SCALAR_PROP(LensBaseProblem, LensLowerLeftY, 0.0);
 SET_SCALAR_PROP(LensBaseProblem, LensLowerLeftZ, 0.0);
-SET_SCALAR_PROP(LensBaseProblem, LensUpperRightX, 4.0);
-SET_SCALAR_PROP(LensBaseProblem, LensUpperRightY, 3.0);
-SET_SCALAR_PROP(LensBaseProblem, LensUpperRightZ, 1.0);
+SET_SCALAR_PROP(LensBaseProblem, LensUpperRightX, 0.0);
+SET_SCALAR_PROP(LensBaseProblem, LensUpperRightY, 0.0);
+SET_SCALAR_PROP(LensBaseProblem, LensUpperRightZ, 0.0);
 
-SET_SCALAR_PROP(LensBaseProblem, DomainSizeX, 6.0);
-SET_SCALAR_PROP(LensBaseProblem, DomainSizeY, 4.0);
+SET_SCALAR_PROP(LensBaseProblem, DomainSizeX, 1.0);
+SET_SCALAR_PROP(LensBaseProblem, DomainSizeY, 1.0);
 SET_SCALAR_PROP(LensBaseProblem, DomainSizeZ, 1.0);
 
-SET_INT_PROP(LensBaseProblem, CellsX, 48);
-SET_INT_PROP(LensBaseProblem, CellsY, 32);
+SET_INT_PROP(LensBaseProblem, CellsX, 50);
+SET_INT_PROP(LensBaseProblem, CellsY, 50);
 SET_INT_PROP(LensBaseProblem, CellsZ, 16);
 
 // The default for the end time of the simulation
@@ -425,10 +428,47 @@ public:
     {
         const GlobalPosition& pos = context.pos(spaceIdx, timeIdx);
 
-        if (onLeftBoundary_(pos) || onRightBoundary_(pos)) {
+        if (onLowerLeftCorner_(pos)) {
+            // mass goes in
+            RateVector massRate(0.0);
+            massRate = 0.0;
+            massRate[contiNEqIdx] = -0.04; // kg / (m^2 * s)
+
+            // impose a forced flow boundary
+            values.setMassRate(massRate);
+        } else
+        if (onUpperRightCorner_(pos)) {
+            //lower pressure on upper corner
+            Scalar T = temperature(context, spaceIdx, timeIdx);
+            Scalar pw, Sw;
+            Sw = 1.0;
+            pw = 5e4;
+            // specify a full fluid state using pw and Sw
+            const MaterialLawParams& matParams = this->materialLawParams(context, spaceIdx, timeIdx);
+
+            Opm::ImmiscibleFluidState<Scalar, FluidSystem,
+            /*storeEnthalpy=*/false> fs;
+            fs.setSaturation(wettingPhaseIdx, Sw);
+            fs.setSaturation(nonWettingPhaseIdx, 1 - Sw);
+            fs.setTemperature(T);
+
+            Scalar pC[numPhases];
+            MaterialLaw::capillaryPressures(pC, matParams, fs);
+            fs.setPressure(wettingPhaseIdx, pw);
+            fs.setPressure(nonWettingPhaseIdx, pw + pC[nonWettingPhaseIdx] - pC[wettingPhaseIdx]);
+
+            // impose an freeflow boundary condition
+            values.setFreeFlow(context, spaceIdx, timeIdx, fs);
+        }
+        else {
+            // no flow boundary
+            values.setNoFlow();
+        }
+
+/*        if (onLeftBoundary_(pos) || onRightBoundary_(pos)) {
             // free flow boundary
             Scalar densityW = WettingPhase::density(temperature_,
-                                                     /*pressure=*/Scalar(1e5));
+                                                     *//*pressure=*//*Scalar(1e5));
 
             Scalar T = temperature(context, spaceIdx, timeIdx);
             Scalar pw, Sw;
@@ -455,7 +495,7 @@ public:
             const MaterialLawParams& matParams = this->materialLawParams(context, spaceIdx, timeIdx);
 
             Opm::ImmiscibleFluidState<Scalar, FluidSystem,
-                                      /*storeEnthalpy=*/false> fs;
+                                      *//*storeEnthalpy=*//*false> fs;
             fs.setSaturation(wettingPhaseIdx, Sw);
             fs.setSaturation(nonWettingPhaseIdx, 1 - Sw);
             fs.setTemperature(T);
@@ -479,7 +519,7 @@ public:
         else {
             // no flow boundary
             values.setNoFlow();
-        }
+        }*/
     }
 
     //! \}
@@ -499,32 +539,48 @@ public:
         Scalar depth = this->boundingBoxMax()[1] - pos[1];
 
         Opm::ImmiscibleFluidState<Scalar, FluidSystem> fs;
-        fs.setPressure(wettingPhaseIdx, /*pressure=*/1e5);
 
-        Scalar Sw = 1.0;
-        fs.setSaturation(wettingPhaseIdx, Sw);
-        fs.setSaturation(nonWettingPhaseIdx, 1 - Sw);
+        if (onUpperRightCorner_(pos)) {
+            //lower pressure on upper corner
+            Scalar pw, Sw;
+            Sw = 1.0;
+            fs.setSaturation(wettingPhaseIdx, Sw);
+            fs.setSaturation(nonWettingPhaseIdx, 1 - Sw);
+            fs.setPressure(wettingPhaseIdx, /*pressure=*/5e4);
 
-        fs.setTemperature(temperature_);
+            // assign the primary variables
+            values.assignNaive(fs);
+        }
+        else {
+            fs.setPressure(wettingPhaseIdx, /*pressure=*/1e5);
 
-        typename FluidSystem::template ParameterCache<Scalar> paramCache;
-        paramCache.updatePhase(fs, wettingPhaseIdx);
-        Scalar densityW = FluidSystem::density(fs, paramCache, wettingPhaseIdx);
+            Scalar Sw = 1.0;
+            fs.setSaturation(wettingPhaseIdx, Sw);
+            fs.setSaturation(nonWettingPhaseIdx, 1 - Sw);
 
-        // hydrostatic pressure (assuming incompressibility)
-        Scalar pw = 1e5 - densityW * this->gravity()[1] * depth;
+            fs.setTemperature(temperature_);
 
-        // calculate the capillary pressure
-        const MaterialLawParams& matParams = this->materialLawParams(context, spaceIdx, timeIdx);
-        Scalar pC[numPhases];
-        MaterialLaw::capillaryPressures(pC, matParams, fs);
+            typename FluidSystem::template ParameterCache<Scalar> paramCache;
+            paramCache.updatePhase(fs, wettingPhaseIdx);
+            Scalar densityW = FluidSystem::density(fs, paramCache, wettingPhaseIdx);
 
-        // make a full fluid state
-        fs.setPressure(wettingPhaseIdx, pw);
-        fs.setPressure(nonWettingPhaseIdx, pw + (pC[wettingPhaseIdx] - pC[nonWettingPhaseIdx]));
+//            // hydrostatic pressure (assuming incompressibility)
+//            Scalar pw = 1e5;// - densityW * this->gravity()[1] * depth;
+//
+//            // calculate the capillary pressure
+//            const MaterialLawParams& matParams = this->materialLawParams(context, spaceIdx, timeIdx);
+//            Scalar pC[numPhases];
+//            MaterialLaw::capillaryPressures(pC, matParams, fs);
+//
+//            // make a full fluid state
+//            fs.setPressure(wettingPhaseIdx, pw);
+//            fs.setPressure(nonWettingPhaseIdx, pw + (pC[wettingPhaseIdx] - pC[nonWettingPhaseIdx]));
 
-        // assign the primary variables
-        values.assignNaive(fs);
+            // assign the primary variables
+            values.assignNaive(fs);
+        }
+
+
     }
 
     /*!
@@ -565,6 +621,16 @@ private:
     bool onUpperBoundary_(const GlobalPosition& pos) const
     { return pos[1] > this->boundingBoxMax()[1] - eps_; }
 
+    bool onUpperRightCorner_ (const GlobalPosition& pos) const
+    {
+        return ((pos[0] > this->boundingBoxMax()[0] - well_radius - eps_) && (pos[1] > this->boundingBoxMax()[1] - well_radius - eps_));
+    }
+
+    bool onLowerLeftCorner_ (const GlobalPosition pos) const
+    {
+        return ((pos[1] < this->boundingBoxMin()[1] + well_radius + eps_) && (pos[0] < this->boundingBoxMin()[0] + well_radius + eps_));
+    }
+
     bool onInlet_(const GlobalPosition& pos) const
     {
         Scalar width = this->boundingBoxMax()[0] - this->boundingBoxMin()[0];
@@ -574,6 +640,8 @@ private:
 
     GlobalPosition lensLowerLeft_;
     GlobalPosition lensUpperRight_;
+
+    double well_radius = 0.02;
 
     DimMatrix lensK_;
     DimMatrix outerK_;
