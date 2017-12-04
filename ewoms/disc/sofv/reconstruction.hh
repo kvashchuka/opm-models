@@ -303,6 +303,13 @@ namespace Ewoms
       return LocalFunctionType( entity, values_[ entityIndex ], gradients_[ entityIndex ] );
     }
 
+      const GridPartType GridPart() const
+      {
+          return gridPart_;
+      };
+
+      const GridPartType& gridPart_;
+
   protected:
     bool checkPhysical( const LocalFunctionType& localRecon ) const
     {
@@ -319,7 +326,7 @@ namespace Ewoms
     }
 
    // const DiscreteFunctionSpaceType& space_;
-    const GridPartType& gridPart_;
+  // const GridPartType& gridPart_;
     const Model& model_;
 
     LimiterFunctionType limiterFunction_;

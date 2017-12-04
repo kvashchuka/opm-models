@@ -6,7 +6,7 @@ project("ewoms" C CXX)
 
 cmake_minimum_required(VERSION 3.0)
 
-set(CMAKE_CXX_FLAGS "-Wfatal-errors")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wfatal-errors")
 # Sibling build
 option(SIBLING_SEARCH "Search for other modules in sibling directories?" ON)
 if(SIBLING_SEARCH)

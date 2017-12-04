@@ -44,6 +44,14 @@
 
 #include <cmath>
 
+#if HAVE_DUNE_FEM
+#include <dune/fem/space/common/functionspace.hh>
+#include <dune/fem/space/finitevolume.hh>
+//#include "reconstruction.hh"
+//#include "limitermodel.hh"
+//#include "limiterutility.hh"
+#endif
+
 namespace Ewoms {
 namespace Properties {
 NEW_PROP_TAG(MaterialLaw);
@@ -126,6 +134,9 @@ class DarcyExtensiveQuantities
     typedef typename GET_PROP_TYPE(TypeTag, ExtensiveQuantities) Implementation;
     typedef typename GET_PROP_TYPE(TypeTag, FluidSystem) FluidSystem;
     typedef typename GET_PROP_TYPE(TypeTag, MaterialLaw) MaterialLaw;
+    typedef typename GET_PROP_TYPE(TypeTag, Model) Model;
+
+    typedef typename GET_PROP_TYPE(TypeTag, Simulator) Simulator;
 
     enum { dimWorld = GridView::dimensionworld };
     enum { numPhases = GET_PROP_VALUE(TypeTag, NumPhases) };
@@ -135,6 +146,13 @@ class DarcyExtensiveQuantities
     typedef Dune::FieldVector<Evaluation, dimWorld> EvalDimVector;
     typedef Dune::FieldVector<Scalar, dimWorld> DimVector;
     typedef Dune::FieldMatrix<Scalar, dimWorld, dimWorld> DimMatrix;
+
+    typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
+    typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
+    enum { dimDomain = GridType::dimensionworld };
+    enum { dimRange  = PrimaryVariables::dimension };
+    typedef Dune::Fem::FunctionSpace<Scalar, Scalar, dimDomain, dimRange> FunctionSpaceType;
+    typedef typename FunctionSpaceType :: RangeType       RangeType;
 
 public:
     /*!
@@ -192,6 +210,8 @@ protected:
     {
         const auto& gradCalc = elemCtx.gradientCalculator();
         Ewoms::PressureCallback<TypeTag> pressureCallback(elemCtx);
+
+        //std::cout << elemCtx.model().discretizationName() << std::endl;
 
         const auto& scvf = elemCtx.stencil(timeIdx).interiorFace(faceIdx);
         const auto& faceNormal = scvf.normal();
@@ -320,11 +340,30 @@ protected:
 
             // we only carry the derivatives along if the upstream DOF is the one which
             // we currently focus on
-            const auto& up = elemCtx.intensiveQuantities(upstreamDofIdx_[phaseIdx], timeIdx);
-            if (upstreamDofIdx_[phaseIdx] == static_cast<int>(focusDofIdx))
-                mobility_[phaseIdx] = up.mobility(phaseIdx);
-            else
-                mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
+            bool higher_order = false;
+           // if (! higher_order) {
+                const auto &up = elemCtx.intensiveQuantities(upstreamDofIdx_[phaseIdx], timeIdx);
+                if (upstreamDofIdx_[phaseIdx] == static_cast<int>(focusDofIdx))
+                    mobility_[phaseIdx] = up.mobility(phaseIdx);
+                else
+                    mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
+            //}
+           //else { //if higher order
+
+            RangeType mobilityTest = RangeType(0.0);
+
+            mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element());
+            //mobility_[phaseIdx] = mobilityTest_;
+
+           // mobility_[phaseIdx] = mobilityTest;
+
+            //mobility os a gradient type, so we need to evaluate only gradents not the solution
+
+//                reconstruction_.update( asImp_().solution(/*timeIdx=*/0), dofMapper() );
+//
+//                ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction( entity );
+//                lfRecEn.evaluateGlobal( interCenter, uLeft );
+            //}
         }
     }
 
@@ -536,12 +575,16 @@ private:
     const Implementation& asImp_() const
     { return *static_cast<const Implementation*>(this); }
 
+   // Simulator simulator;
+
 protected:
     // intrinsic permeability tensor and its square root
     DimMatrix K_;
 
     // mobilities of all fluid phases [1 / (Pa s)]
     Evaluation mobility_[numPhases];
+
+    Evaluation mobilityTest_;
 
     // filter velocities of all phases [m/s]
     EvalDimVector filterVelocity_[numPhases];

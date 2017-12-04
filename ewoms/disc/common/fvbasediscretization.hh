@@ -1225,6 +1225,9 @@ public:
     void updateBegin()
     { }
 
+    //RangeType evalHigherOrder(EntityType & entity)
+    //{  }
+
     /*!
      * \brief Called by the update() method if it was
      *        successful.

@@ -140,10 +140,42 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef typename GET_PROP_TYPE(TypeTag, SolutionVector) SolutionVector;
     typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
     typedef typename GET_PROP_TYPE(TypeTag, Simulator) Simulator;
+    typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
+    typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
+    enum { dimDomain = GridType::dimensionworld };
+    enum { dimRange  = PrimaryVariables::dimension };
+
+    // intersection iterator type
+    typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
+    // intersection type
+    typedef typename IntersectionIteratorType::Intersection IntersectionType;
+    // geometry of intersection
+    typedef typename IntersectionType::Geometry IntersectionGeometryType;
+
+    typedef typename GET_PROP_TYPE(TypeTag, Scalar) Scalar;
+    typedef Dune::Fem::FunctionSpace<Scalar, Scalar, dimDomain, dimRange> FunctionSpaceType;
+    typedef typename FunctionSpaceType :: DomainType      DomainType;
+    typedef typename FunctionSpaceType :: DomainFieldType DomainFieldType;
+    typedef typename FunctionSpaceType :: RangeType       RangeType;
+    typedef typename FunctionSpaceType :: RangeFieldType  RangeFieldType;
 
     typedef LimiterModel<TypeTag> LimiterModelType;
     typedef LimitedReconstruction< TypeTag > ReconstructionType;
 
+    typedef LimiterUtility< TypeTag >      LimiterUtilityType;
+    typedef typename LimiterUtilityType :: GradientType      GradientType;
+
+    typedef typename ReconstructionType::LocalFunctionType  ReconstructedLocalFunctionType;
+
+    typedef typename GridView::template Codim<0>::Entity EntityType;
+    // geometry type
+    typedef typename EntityType::Geometry GeometryType;
+    // global coordinates
+    typedef typename GeometryType::GlobalCoordinate GlobalCoordinateType;
+    // local coordinates
+    typedef typename GeometryType::LocalCoordinate LocalCoordinateType;
+
+    const bool higherOrder_ = true;
 
 public:
     SofvDiscretization(Simulator& simulator)
@@ -169,7 +201,35 @@ public:
         {
             // compute linear reconstructions
             reconstruction_.update( asImp_().solution(/*timeIdx=*/0), dofMapper() );
+           // std::cout << "Function from sofvdiscretization updateBegin() got called " << std::endl;
         }
+    }
+
+    RangeType evalHigherOrder (const EntityType & entity) const
+    {
+        if( higherOrder_ )
+        {
+            RangeType uLeft;
+
+            const GridPartType &gridPart = reconstruction_.GridPart();
+            int count = 0;
+
+            const IntersectionIteratorType iitend = gridPart.iend( entity );
+            for( IntersectionIteratorType iit = gridPart.ibegin( entity ); iit != iitend; ++iit, ++count ) {
+                const IntersectionType &intersection = *iit;
+                /* Fetch the intersection's geometry */
+                const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
+                //! [iteration over intersections]
+
+                //! [evaluation of local function]
+                const GlobalCoordinateType interCenter = intersectionGeometry.center();
+
+                ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction(entity);
+                lfRecEn.evaluateGlobal(interCenter, uLeft);
+            }
+            return uLeft;
+        }
+
     }
 
     /*!
@@ -239,9 +299,9 @@ private:
     { return *static_cast<Implementation*>(this); }
     const Implementation& asImp_() const
     { return *static_cast<const Implementation*>(this); }
-    mutable ReconstructionType reconstruction_;
     LimiterModelType limiterModel_;
-    const bool higherOrder_ = true;
+    mutable ReconstructionType reconstruction_;
+
 };
 } // namespace Ewoms
 
