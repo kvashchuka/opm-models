@@ -134,6 +134,7 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
 {
     typedef FvBaseDiscretization<TypeTag> ParentType;
 
+    typedef typename GET_PROP_TYPE(TypeTag, ElementContext) ElementContext;
     typedef typename GET_PROP_TYPE(TypeTag, Model) Implementation;
     typedef typename GET_PROP_TYPE(TypeTag, DofMapper) DofMapper;
     typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
@@ -159,6 +160,8 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef typename FunctionSpaceType :: RangeType       RangeType;
     typedef typename FunctionSpaceType :: RangeFieldType  RangeFieldType;
 
+    enum { numPhases = GET_PROP_VALUE(TypeTag, NumPhases) };
+
     typedef LimiterModel<TypeTag> LimiterModelType;
     typedef LimitedReconstruction< TypeTag > ReconstructionType;
 
@@ -178,6 +181,7 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     const bool higherOrder_ = true;
 
 public:
+    using ParentType::simulator_;
     SofvDiscretization(Simulator& simulator)
         : ParentType(simulator),
           limiterModel_(),
@@ -199,8 +203,42 @@ public:
     {
         if( higherOrder_ )
         {
+            ElementContext elemCtx(simulator_);
+
+            size_t numDof = asImp_().numGridDof();
+
+            std::vector<RangeType> totalMobility(numDof);
+
+            // iterate through the grid and evaluate the initial condition
+            const auto & gridView = simulator_.gridManager().gridView();
+            auto elemIt = gridView.template begin</*codim=*/0>();
+            const auto& elemEndIt = gridView.template end</*codim=*/0>();
+            for (; elemIt != elemEndIt; ++elemIt) {
+                const auto& elem = *elemIt;
+
+                // deal with the current element
+                elemCtx.updatePrimaryStencil(elem);
+
+                // loop over all element vertices, i.e. sub control volumes
+                for (unsigned dofIdx = 0; dofIdx < elemCtx.numPrimaryDof(/*timeIdx=*/0); dofIdx++) {
+                    // map the local degree of freedom index to the global one
+                    unsigned globalIdx = elemCtx.globalSpaceIndex(dofIdx, /*timeIdx=*/0);
+
+                    for (unsigned phaseIdx = 0; phaseIdx < numPhases; ++phaseIdx) {
+                        if (!elemCtx.model().phaseIsConsidered(phaseIdx)) {
+                            totalMobility[globalIdx][phaseIdx] = 0.0;
+                            continue;
+                        }
+
+                        totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx).value();
+
+                    }
+                }
+            }
+
+
             // compute linear reconstructions
-            reconstruction_.update( asImp_().solution(/*timeIdx=*/0), dofMapper() );
+            reconstruction_.update( totalMobility, dofMapper() );
            // std::cout << "Function from sofvdiscretization updateBegin() got called " << std::endl;
         }
     }
@@ -292,6 +330,10 @@ public:
     {
         res.template deserializeEntities</*codim=*/0>(asImp_(), this->gridView_);
         this->solution(/*timeIdx=*/1) = this->solution(/*timeIdx=*/0);
+    }
+
+    ReconstructionType& reconstruction() const {
+        return reconstruction_;
     }
 
 private:

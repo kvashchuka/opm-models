@@ -208,13 +208,17 @@ protected:
                              unsigned faceIdx,
                              unsigned timeIdx)
     {
+        auto& reconstruction = elemCtx.problem().model().reconstruction();
+
         const auto& gradCalc = elemCtx.gradientCalculator();
         Ewoms::PressureCallback<TypeTag> pressureCallback(elemCtx);
 
         //std::cout << elemCtx.model().discretizationName() << std::endl;
 
-        const auto& scvf = elemCtx.stencil(timeIdx).interiorFace(faceIdx);
+        const auto& stencil = elemCtx.stencil(timeIdx);
+        const auto& scvf = stencil.interiorFace(faceIdx);
         const auto& faceNormal = scvf.normal();
+        const auto& integrationPos = scvf.integrationPos();
 
         unsigned i = scvf.interiorIndex();
         unsigned j = scvf.exteriorIndex();
@@ -350,9 +354,16 @@ protected:
             //}
            //else { //if higher order
 
-            RangeType mobilityTest = RangeType(0.0);
+            //! [evaluation of local function]
+            RangeType uLeft;
+            auto lfRecEn = reconstruction.localFunction(stencil.element(upstreamDofIdx_[phaseIdx]));
+            lfRecEn.evaluateGlobal(integrationPos, uLeft);
 
-            mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element());
+            mobility_[phaseIdx] = uLeft[phaseIdx];
+
+            //RangeType mobilityTest = RangeType(0.0);
+
+            //mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element());
             //mobility_[phaseIdx] = mobilityTest_;
 
            // mobility_[phaseIdx] = mobilityTest;

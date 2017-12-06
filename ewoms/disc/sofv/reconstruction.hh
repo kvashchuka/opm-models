@@ -30,7 +30,7 @@ namespace Ewoms
       typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
       typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
       typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
-      typedef typename GET_PROP_TYPE(TypeTag, SolutionVector) SolutionVector;
+      //typedef typename GET_PROP_TYPE(TypeTag, SolutionVector) SolutionVector;
       typedef typename GET_PROP_TYPE(TypeTag, DofMapper) DofMapper;
       //typedef typename Dune::Fem::BasicGridFunctionAdapter::GridPartType GridPartType;
       typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
@@ -44,6 +44,8 @@ namespace Ewoms
 
       typedef Dune::FieldVector<typename GridType::ctype, dimDomain> DomainType;
       typedef Dune::FieldVector<RangeFieldType, dimRange> RangeType;
+
+      typedef std::vector<RangeType> SolutionVector;
 
     typedef LimiterUtility< TypeTag >      LimiterUtilityType;
     typedef typename LimiterUtilityType :: GradientType      GradientType;
@@ -303,7 +305,7 @@ namespace Ewoms
       return LocalFunctionType( entity, values_[ entityIndex ], gradients_[ entityIndex ] );
     }
 
-      const GridPartType GridPart() const
+      const GridPartType & GridPart() const
       {
           return gridPart_;
       };
