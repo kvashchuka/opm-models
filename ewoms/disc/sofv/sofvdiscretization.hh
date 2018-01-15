@@ -230,12 +230,12 @@ public:
                             continue;
                         }
 
-                        totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx).value();
+                        //totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx).value();
+                        totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx);
 
                     }
                 }
             }
-
 
             // compute linear reconstructions
             reconstruction_.update( totalMobility, dofMapper() );
@@ -265,6 +265,7 @@ public:
                 ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction(entity);
                 lfRecEn.evaluateGlobal(interCenter, uLeft);
             }
+           // std::cout << "in eval higher order " << std::endl;
             return uLeft;
         }
 

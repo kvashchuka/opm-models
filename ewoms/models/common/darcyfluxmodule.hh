@@ -344,27 +344,27 @@ protected:
 
             // we only carry the derivatives along if the upstream DOF is the one which
             // we currently focus on
-            bool higher_order = false;
-           // if (! higher_order) {
+            bool higher_order = true;
+            if (! higher_order) {
                 const auto &up = elemCtx.intensiveQuantities(upstreamDofIdx_[phaseIdx], timeIdx);
                 if (upstreamDofIdx_[phaseIdx] == static_cast<int>(focusDofIdx))
                     mobility_[phaseIdx] = up.mobility(phaseIdx);
                 else
                     mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
-            //}
-           //else { //if higher order
+            }
+           else { //if higher order
 
-            //! [evaluation of local function]
+/*            //! [evaluation of local function]
             RangeType uLeft;
             auto lfRecEn = reconstruction.localFunction(stencil.element(upstreamDofIdx_[phaseIdx]));
             lfRecEn.evaluateGlobal(integrationPos, uLeft);
 
-            mobility_[phaseIdx] = uLeft[phaseIdx];
+            mobility_[phaseIdx] = uLeft[phaseIdx];*/
 
             //RangeType mobilityTest = RangeType(0.0);
 
-            //mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element());
-            //mobility_[phaseIdx] = mobilityTest_;
+            auto mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element());
+            mobility_[phaseIdx] = mobilityTest_;
 
            // mobility_[phaseIdx] = mobilityTest;
 
@@ -374,7 +374,7 @@ protected:
 //
 //                ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction( entity );
 //                lfRecEn.evaluateGlobal( interCenter, uLeft );
-            //}
+            }
         }
     }
 
