@@ -77,6 +77,7 @@ namespace Ewoms
     LimitedReconstruction( const GridPartType &gridPart, const Model& limiterModel, const DofMapper& dofMapper)
       : //space_( space )
         gridPart_( gridPart )
+      , dofMapper_( dofMapper )
       , model_( limiterModel )
       , limiterFunction_()
       , conformingComboSet_()
@@ -86,7 +87,7 @@ namespace Ewoms
     {}
 
     //! calculate internal reconstruction based on mean values of U
-    void update( const SolutionVector & U, const DofMapper& dofMapper )
+    void update( const SolutionVector & U )
     {
       const size_t size = gridPart_.indexSet().size( 0 ) ;
       // resize gradient vector
@@ -96,7 +97,7 @@ namespace Ewoms
       const auto end = gridPart_.template end< 0, Dune::Interior_Partition >();
       for( auto it = gridPart_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
       {
-        applyLocal( *it, U, dofMapper );
+        applyLocal( *it, U, dofMapper_ );
       }
     }
 
@@ -152,11 +153,12 @@ namespace Ewoms
       bool evaluate( const EntityType& entity, RangeType& value ) const
       {
         //const LocalFunctionType& uEn = U_.localFunction( entity );
-        unsigned dofIdx = dofMapper_.index(entity);
+        unsigned int dofIdx = dofMapper_.index(entity);
         for( int i=0; i<dimRange; ++i )
         {
           value[ i ] = U_[ dofIdx][i];
         }
+        //std::cout << "Baseline " << value << std::endl;
         return true;
       }
 
@@ -199,12 +201,14 @@ namespace Ewoms
 
       void evaluateGlobal( const DomainType& point, RangeType& value ) const
       {
+        // set u
+        value = value_;
+        //std::cout << "value = " << value_ << std::endl;
+        return ;
+
         // compute point of evaluation
         DomainType x( point );
         x -= center_;
-
-        // set u
-        value = value_;
 
         for( int i=0; i<dimRange; ++i )
         {
@@ -222,7 +226,7 @@ namespace Ewoms
       EvalAverage average( U, dofMapper );
 
      // const unsigned int entityIndex = U.space().gridPart().indexSet().index( entity );
-      unsigned entityIndex = dofMapper.index(entity); //dofIdx usually
+      unsigned int entityIndex = dofMapper.index(entity); //dofIdx usually
 
       // get geometry
       const Geometry& geo = entity.geometry();
@@ -294,23 +298,23 @@ namespace Ewoms
     //! return local reconstruction
     LocalFunctionType localFunction( const EntityType& entity )
     {
-      const unsigned int entityIndex = gridPart_.indexSet().index( entity );
+      const unsigned int entityIndex = dofMapper_.index( entity );
       return LocalFunctionType( entity, values_[ entityIndex ], gradients_[ entityIndex ] );
     }
 
     //! return local reconstruction
     const LocalFunctionType localFunction( const EntityType& entity ) const
     {
-      const unsigned int entityIndex = gridPart_.indexSet().index( entity );
+      const unsigned int entityIndex = dofMapper_.index( entity );
       return LocalFunctionType( entity, values_[ entityIndex ], gradients_[ entityIndex ] );
     }
 
-      const GridPartType & GridPart() const
-      {
-          return gridPart_;
-      };
+    const GridPartType & GridPart() const
+    {
+        return gridPart_;
+    };
 
-      const GridPartType& gridPart_;
+    const GridPartType& gridPart_;
 
   protected:
     bool checkPhysical( const LocalFunctionType& localRecon ) const
@@ -326,6 +330,8 @@ namespace Ewoms
       }
       return true;
     }
+
+    const DofMapper& dofMapper_;
 
    // const DiscreteFunctionSpaceType& space_;
   // const GridPartType& gridPart_;
