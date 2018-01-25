@@ -143,6 +143,7 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef typename GET_PROP_TYPE(TypeTag, Simulator) Simulator;
     typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
     typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
+
     enum { dimDomain = GridType::dimensionworld };
     enum { dimRange  = PrimaryVariables::dimension };
 
@@ -218,11 +219,14 @@ public:
 
                 // deal with the current element
                 elemCtx.updatePrimaryStencil(elem);
+                elemCtx.updateIntensiveQuantities( 0 );
 
                 // loop over all element vertices, i.e. sub control volumes
                 for (unsigned dofIdx = 0; dofIdx < elemCtx.numPrimaryDof(/*timeIdx=*/0); dofIdx++) {
                     // map the local degree of freedom index to the global one
                     unsigned globalIdx = elemCtx.globalSpaceIndex(dofIdx, /*timeIdx=*/0);
+
+                    //std::cout << "dofIdx = " << dofIdx << std::endl;
 
                     for (unsigned phaseIdx = 0; phaseIdx < numPhases; ++phaseIdx) {
                         if (!elemCtx.model().phaseIsConsidered(phaseIdx)) {
@@ -231,44 +235,59 @@ public:
                         }
 
                         //totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx).value();
-                        totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx);
+                        //std::cout << elemCtx.intensiveQuantities(dofIdx,0).mobility(phaseIdx) << " mob base"  << std::endl;
+                        totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx).value();
 
                     }
                 }
             }
 
             // compute linear reconstructions
-            reconstruction_.update( totalMobility, dofMapper() );
-           // std::cout << "Function from sofvdiscretization updateBegin() got called " << std::endl;
+            reconstruction_.update( totalMobility );
+            std::cout << "Function from sofvdiscretization updateBegin() got called " << std::endl;
         }
     }
 
-    RangeType evalHigherOrder (const EntityType & entity) const
+    RangeType evalHigherOrder (const EntityType & entity,
+                               const int upstream, const int downstream) const
     {
-        if( higherOrder_ )
+        RangeType uLeft( 0 );
+        //if( higherOrder_ )
         {
-            RangeType uLeft;
+            const int faceIdx = std::max( upstream, downstream );
 
             const GridPartType &gridPart = reconstruction_.GridPart();
             int count = 0;
 
             const IntersectionIteratorType iitend = gridPart.iend( entity );
-            for( IntersectionIteratorType iit = gridPart.ibegin( entity ); iit != iitend; ++iit, ++count ) {
+            for( IntersectionIteratorType iit = gridPart.ibegin( entity ); iit != iitend; ++iit, ++count )
+            {
                 const IntersectionType &intersection = *iit;
-                /* Fetch the intersection's geometry */
-                const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
-                //! [iteration over intersections]
+                if( intersection.indexInInside() == faceIdx )
+                {
+                    /* Fetch the intersection's geometry */
+                    const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
+                    //! [iteration over intersections]
 
-                //! [evaluation of local function]
-                const GlobalCoordinateType interCenter = intersectionGeometry.center();
+                    //! [evaluation of local function]
+                    const GlobalCoordinateType interCenter = intersectionGeometry.center();
 
-                ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction(entity);
-                lfRecEn.evaluateGlobal(interCenter, uLeft);
+                    if( upstream == 0 || intersection.boundary() )
+                    {
+                        ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction(entity);
+                        lfRecEn.evaluateGlobal(interCenter, uLeft);
+                    }
+                    else
+                    {
+                        ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction(intersection.outside());
+                        lfRecEn.evaluateGlobal(interCenter, uLeft);
+                    }
+                    break;
+                }
             }
-           // std::cout << "in eval higher order " << std::endl;
-            return uLeft;
         }
-
+        // std::cout << "in eval higher order " << std::endl;
+        return uLeft;
     }
 
     /*!

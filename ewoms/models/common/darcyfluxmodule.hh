@@ -344,7 +344,7 @@ protected:
 
             // we only carry the derivatives along if the upstream DOF is the one which
             // we currently focus on
-            bool higher_order = true;
+            bool higher_order = false;
             if (! higher_order) {
                 const auto &up = elemCtx.intensiveQuantities(upstreamDofIdx_[phaseIdx], timeIdx);
                 if (upstreamDofIdx_[phaseIdx] == static_cast<int>(focusDofIdx))
@@ -352,7 +352,12 @@ protected:
                 else
                     mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
             }
-           else { //if higher order
+
+            //std::cout << mobility_[phaseIdx] << " mob " << std::endl;
+
+            //if( higher_order )
+            {
+           //else { //if higher order
 
 /*            //! [evaluation of local function]
             RangeType uLeft;
@@ -362,9 +367,29 @@ protected:
             mobility_[phaseIdx] = uLeft[phaseIdx];*/
 
             //RangeType mobilityTest = RangeType(0.0);
+            //const auto &up = elemCtx.intensiveQuantities(upstreamDofIdx_[phaseIdx], timeIdx);
+            //if (upstreamDofIdx_[phaseIdx] == static_cast<int>(focusDofIdx))
+            //    mobility_[phaseIdx] = up.mobility(phaseIdx);
+            //else
+            //    mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
 
-            auto mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element());
-            mobility_[phaseIdx] = mobilityTest_;
+            //std::cout << interiorDofIdx_ << "  " << exteriorDofIdx_ << std::endl;
+
+            // upwinding is done inside evalHigherOrder
+            RangeType mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element(),upstreamDofIdx_[phaseIdx], downstreamDofIdx_[phaseIdx]);
+            mobility_[phaseIdx] = mobilityTest[ phaseIdx ];
+
+            /*
+            // if we are at the upstream element
+            if (upstreamDofIdx_[phaseIdx] == static_cast<int>(focusDofIdx))
+            {
+                RangeType mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element());
+                mobility_[phaseIdx] = mobilityTest[ phaseIdx ];
+            }
+            else
+            {
+            }
+            */
 
            // mobility_[phaseIdx] = mobilityTest;
 
@@ -375,6 +400,8 @@ protected:
 //                ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction( entity );
 //                lfRecEn.evaluateGlobal( interCenter, uLeft );
             }
+
+            //std::cout << mobility_[phaseIdx] << " mob 2nd " << std::endl;
         }
     }
 
@@ -594,8 +621,6 @@ protected:
 
     // mobilities of all fluid phases [1 / (Pa s)]
     Evaluation mobility_[numPhases];
-
-    Evaluation mobilityTest_;
 
     // filter velocities of all phases [m/s]
     EvalDimVector filterVelocity_[numPhases];
