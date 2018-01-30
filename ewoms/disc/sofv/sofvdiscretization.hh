@@ -202,7 +202,11 @@ public:
  */
     void updateBegin()
     {
-        if( higherOrder_ )
+        updateReconstruction_();
+    }
+
+    void updateReconstruction_ ( ){
+        //if( higherOrder_ )
         {
             ElementContext elemCtx(simulator_);
 
@@ -236,7 +240,9 @@ public:
 
                         //totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx).value();
                         //std::cout << elemCtx.intensiveQuantities(dofIdx,0).mobility(phaseIdx) << " mob base"  << std::endl;
-                        totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx).value();
+                        //totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx).value();
+                        // for the case when AD is switched OFF
+                        totalMobility[globalIdx][phaseIdx] = elemCtx.intensiveQuantities(dofIdx,  /*timeIdx=*/0).mobility(phaseIdx);
 
                     }
                 }
@@ -244,7 +250,7 @@ public:
 
             // compute linear reconstructions
             reconstruction_.update( totalMobility );
-            std::cout << "Function from sofvdiscretization updateBegin() got called " << std::endl;
+            //std::cout << "Function from sofvdiscretization updateBegin() got called " << std::endl;
         }
     }
 
@@ -257,33 +263,44 @@ public:
             const int faceIdx = std::max( upstream, downstream );
 
             const GridPartType &gridPart = reconstruction_.GridPart();
-            int count = 0;
+            int count = 1;
 
             const IntersectionIteratorType iitend = gridPart.iend( entity );
-            for( IntersectionIteratorType iit = gridPart.ibegin( entity ); iit != iitend; ++iit, ++count )
+            for( IntersectionIteratorType iit = gridPart.ibegin( entity ); iit != iitend; ++iit )
             {
                 const IntersectionType &intersection = *iit;
-                if( intersection.indexInInside() == faceIdx )
+
+                if (intersection.boundary())
+                    continue;
+
+              if( /*intersection.indexInInside() == faceIdx*/ count == faceIdx )
                 {
-                    /* Fetch the intersection's geometry */
+                    // Fetch the intersection's geometry
                     const IntersectionGeometryType &intersectionGeometry = intersection.geometry();
                     //! [iteration over intersections]
 
                     //! [evaluation of local function]
                     const GlobalCoordinateType interCenter = intersectionGeometry.center();
 
-                    if( upstream == 0 || intersection.boundary() )
+                    //std::cout << "upstream " << upstream << " downstream " << downstream << " count " << count << " faceIdx " << faceIdx << std::endl;
+
+                    if( upstream == 0 /*|| intersection.boundary()*/ )
                     {
                         ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction(entity);
                         lfRecEn.evaluateGlobal(interCenter, uLeft);
+
+                        //std::cout << "uLeft on entity " << uLeft << std::endl;
                     }
                     else
                     {
                         ReconstructedLocalFunctionType lfRecEn = reconstruction_.localFunction(intersection.outside());
                         lfRecEn.evaluateGlobal(interCenter, uLeft);
+
+                        //std::cout << "uLeft on outside " << uLeft << std::endl;
                     }
                     break;
                 }
+                ++count;
             }
         }
         // std::cout << "in eval higher order " << std::endl;

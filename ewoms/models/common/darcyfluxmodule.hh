@@ -226,6 +226,8 @@ protected:
         exteriorDofIdx_ = static_cast<short>(j);
         unsigned focusDofIdx = elemCtx.focusDofIndex();
 
+        //std::cout << " interiorDofIdx_ " <<  interiorDofIdx_ << " exteriorDofIdx_  " <<  exteriorDofIdx_  << std::endl;
+
         // calculate the "raw" pressure gradient
         for (unsigned phaseIdx = 0; phaseIdx < numPhases; ++phaseIdx) {
             if (!elemCtx.model().phaseIsConsidered(phaseIdx)) {
@@ -342,8 +344,14 @@ protected:
                 downstreamDofIdx_[phaseIdx] = exteriorDofIdx_;
             }
 
+//            std::cout << " numDof " << elemCtx.numDof(0) << std::endl;
+//            std::cout << " upstreamDofIdx_[phaseIdx] " << upstreamDofIdx_[phaseIdx] << std::endl;
+//            std::cout << " downstreamDofIdx_[phaseIdx] " << downstreamDofIdx_[phaseIdx] << std::endl;
+
             // we only carry the derivatives along if the upstream DOF is the one which
-            // we currently focus on
+            // we currently focus on (needed with AD, in the case of automatic differentiation, all derivatives are with regard to
+            // the primary variables of that degree of freedom. Only "primary" DOFs can be
+            // focused on.)
             bool higher_order = false;
             if (! higher_order) {
                 const auto &up = elemCtx.intensiveQuantities(upstreamDofIdx_[phaseIdx], timeIdx);
@@ -352,8 +360,7 @@ protected:
                 else
                     mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
             }
-
-            //std::cout << mobility_[phaseIdx] << " mob " << std::endl;
+            //std::cout << mobility_[phaseIdx] << " mob 1st " << std::endl;
 
             //if( higher_order )
             {
@@ -373,10 +380,17 @@ protected:
             //else
             //    mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
 
-            //std::cout << interiorDofIdx_ << "  " << exteriorDofIdx_ << std::endl;
-
             // upwinding is done inside evalHigherOrder
             RangeType mobilityTest = elemCtx.model().evalHigherOrder(elemCtx.element(),upstreamDofIdx_[phaseIdx], downstreamDofIdx_[phaseIdx]);
+            if (std::abs (mobility_[phaseIdx] - mobilityTest[ phaseIdx ]) > 1e-12) {
+               //std::cout << " first order = " << mobility_[phaseIdx] << " second order = " << mobilityTest[ phaseIdx ] << std::endl;
+               // std::cout << "full second mobility  " << mobilityTest << std::endl;
+                //std::cout << " upstreamDofIdx_[phaseIdx] " << upstreamDofIdx_[phaseIdx] << std::endl;
+                //std::cout << " downstreamDofIdx_[phaseIdx] " << downstreamDofIdx_[phaseIdx] << std::endl;
+                //assert( false );
+                //std::abort();
+            }
+
             mobility_[phaseIdx] = mobilityTest[ phaseIdx ];
 
             /*
@@ -401,8 +415,9 @@ protected:
 //                lfRecEn.evaluateGlobal( interCenter, uLeft );
             }
 
-            //std::cout << mobility_[phaseIdx] << " mob 2nd " << std::endl;
+           // std::cout << mobility_[phaseIdx] << " mob 2nd " << std::endl;
         }
+
     }
 
     /*!

@@ -140,6 +140,7 @@ protected:
                                                                   /*timeIdx=*/0,
                                                                   /*valid=*/false);
         }
+        model_().updateReconstruction();
     }
 
     /*!

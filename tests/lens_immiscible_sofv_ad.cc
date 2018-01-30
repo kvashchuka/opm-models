@@ -42,7 +42,7 @@ NEW_TYPE_TAG(LensProblemSofvAd, INHERITS_FROM(ImmiscibleTwoPhaseModel, LensBaseP
 SET_TAG_PROP(LensProblemSofvAd, SpatialDiscretizationSplice, SofvDiscretization);
 
 // use automatic differentiation for this simulator
-SET_TAG_PROP(LensProblemSofvAd, LocalLinearizerSplice, AutoDiffLocalLinearizer);
+//SET_TAG_PROP(LensProblemSofvAd, LocalLinearizerSplice, AutoDiffLocalLinearizer);
 }}
 
 

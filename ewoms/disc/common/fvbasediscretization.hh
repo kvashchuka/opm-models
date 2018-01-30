@@ -512,6 +512,13 @@ public:
     bool enableGridAdaptation() const
     { return enableGridAdaptation_; }
 
+    void updateReconstruction ( ) {
+            asImp_().updateReconstruction_();
+    }
+
+    void updateReconstruction_ ( ) {
+    }
+
     /*!
      * \brief Applies the initial solution for all degrees of freedom to which the model
      *        applies.
