@@ -192,8 +192,10 @@ public:
         reset_(elemCtx);
 
         // compute the local residual and its Jacobian
-        unsigned numPrimaryDof = elemCtx.numPrimaryDof(/*timeIdx=*/0);
+        //unsigned numPrimaryDof = elemCtx.numPrimaryDof(/*timeIdx=*/0);
+        unsigned numPrimaryDof = elemCtx.stencil(0).numPrimaryDof2();
         for (unsigned focusDofIdx = 0; focusDofIdx < numPrimaryDof; focusDofIdx++) {
+            //std::cout << "-------------------------" << focusDofIdx << "-----------" << std::endl;
             elemCtx.setFocusDofIndex(focusDofIdx);
             elemCtx.updateAllExtensiveQuantities();
 
@@ -258,7 +260,8 @@ protected:
     void resize_(const ElementContext& elemCtx)
     {
         size_t numDof = elemCtx.numDof(/*timeIdx=*/0);
-        size_t numPrimaryDof = elemCtx.numPrimaryDof(/*timeIdx=*/0);
+        //size_t numPrimaryDof = elemCtx.numPrimaryDof(/*timeIdx=*/0);
+        size_t numPrimaryDof = elemCtx.stencil(0).numPrimaryDof2();
 
         residual_.resize(numDof);
         jacobian_.setSize(numDof, numPrimaryDof);

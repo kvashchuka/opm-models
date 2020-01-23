@@ -223,6 +223,12 @@ SET_SCALAR_PROP(FvBaseDiscretization, MinTimeStepSize, 0.0);
 //! Disable grid adaptation by default
 SET_BOOL_PROP(FvBaseDiscretization, EnableGridAdaptation, false);
 
+//! Disable higher order by default
+SET_BOOL_PROP(FvBaseDiscretization, EnableHigherOrder, false);
+
+//! By default do reconstruction for all equations if reconstruction is enabled
+SET_BOOL_PROP(FvBaseDiscretization, OnlyReconstructionForSolventOrPolymer, false);
+
 //! By default, write the simulation output to the current working directory
 SET_STRING_PROP(FvBaseDiscretization, OutputDir, ".");
 
@@ -271,6 +277,9 @@ SET_BOOL_PROP(FvBaseDiscretization, ExtensiveStorageTerm, false);
 
 // use volumetric residuals is default
 SET_BOOL_PROP(FvBaseDiscretization, UseVolumetricResidual, true);
+
+SET_BOOL_PROP(FvBaseDiscretization, EnableLocalReconstruction, false);
+SET_BOOL_PROP(FvBaseDiscretization, ReconstructionSchemeId, 3); // 2 == least squares, 3 == LP
 
 //! eWoms is mainly targeted at research, so experimental features are enabled by
 //! default.
@@ -324,10 +333,13 @@ class FvBaseDiscretization
         historySize = GET_PROP_VALUE(TypeTag, TimeDiscHistorySize),
     };
 
+
     typedef std::vector<IntensiveQuantities, Opm::aligned_allocator<IntensiveQuantities, alignof(IntensiveQuantities)> > IntensiveQuantitiesVector;
 
     typedef typename GridView::template Codim<0>::Entity Element;
     typedef typename GridView::template Codim<0>::Iterator ElementIterator;
+
+    typedef typename Element :: Geometry :: GlobalCoordinate GlobalCoordinate;
 
     typedef Opm::MathToolbox<Evaluation> Toolbox;
     typedef Dune::FieldVector<Evaluation, numEq> VectorBlock;
@@ -370,6 +382,8 @@ class FvBaseDiscretization
     typedef size_t              DiscreteFunctionSpace;
 #endif
 
+    typedef Dune::FieldVector< Evaluation, numEq > RangeType;
+
     // copying a discretization object is not a good idea
     FvBaseDiscretization(const FvBaseDiscretization& );
 
@@ -396,6 +410,8 @@ public:
         , space_( asImp_().numGridDof() )
 #endif
         , enableGridAdaptation_( EWOMS_GET_PARAM(TypeTag, bool, EnableGridAdaptation) )
+        , enableHigherOrder_( EWOMS_GET_PARAM(TypeTag, bool, EnableHigherOrder) )
+        , reconstructOnlySolventOrPolymer_( EWOMS_GET_PARAM(TypeTag, bool, OnlyReconstructionForSolventOrPolymer) )
         , enableIntensiveQuantityCache_(EWOMS_GET_PARAM(TypeTag, bool, EnableIntensiveQuantityCache))
         , enableStorageCache_(EWOMS_GET_PARAM(TypeTag, bool, EnableStorageCache))
         , enableThermodynamicHints_(EWOMS_GET_PARAM(TypeTag, bool, EnableThermodynamicHints))
@@ -462,6 +478,10 @@ public:
         Opm::VtkPrimaryVarsModule<TypeTag>::registerParameters();
 
         EWOMS_REGISTER_PARAM(TypeTag, bool, EnableGridAdaptation, "Enable adaptive grid refinement/coarsening");
+        EWOMS_REGISTER_PARAM(TypeTag, bool, EnableHigherOrder, "Enable higher order finite volume schemes");
+        EWOMS_REGISTER_PARAM(TypeTag, bool, OnlyReconstructionForSolventOrPolymer, "Enable higher order finite volume schemes for solvent or polymer equation only");
+        EWOMS_REGISTER_PARAM(TypeTag, bool, EnableLocalReconstruction, "Enable local reconstruction");
+        EWOMS_REGISTER_PARAM(TypeTag, int , ReconstructionSchemeId, "Reconstruction scheme id");
         EWOMS_REGISTER_PARAM(TypeTag, bool, EnableVtkOutput, "Global switch for turning on writing VTK files");
         EWOMS_REGISTER_PARAM(TypeTag, bool, EnableThermodynamicHints, "Enable thermodynamic hints");
         EWOMS_REGISTER_PARAM(TypeTag, bool, EnableIntensiveQuantityCache, "Turn on caching of intensive quantities");
@@ -478,6 +498,8 @@ public:
         size_t numDof = asImp_().numGridDof();
         dofTotalVolume_.resize(numDof);
         std::fill(dofTotalVolume_.begin(), dofTotalVolume_.end(), 0.0);
+
+        std::cout << "number_of_elements = " << numDof << std::endl;
 
         ElementContext elemCtx(simulator_);
         gridTotalVolume_ = 0.0;
@@ -546,6 +568,36 @@ public:
      */
     bool enableGridAdaptation() const
     { return enableGridAdaptation_; }
+
+    /*!
+     * \brief Returns whether the grid ought to be adapted to the solution during the simulation.
+     */
+    bool enableHigherOrder() const
+    { return enableHigherOrder_; }
+
+    /*!
+     * \brief Returns whether the reconstruction is only enabled for solvent or polymer if reconstruction is enabled
+     */
+    bool reconstructOnlySolventOrPolymer() const
+    { return reconstructOnlySolventOrPolymer_; }
+
+    void updateReconstruction ( ) {
+            asImp_().updateReconstruction_();
+    }
+
+    void updateReconstruction_ ( ) {}
+
+    void evaluateReconstruction( const ElementContext&,
+                                 const int,
+                                 const GlobalCoordinate&,
+                                 RangeType&,
+                                 RangeType& ) const {}
+
+    void evaluateReconstruction(const ElementContext&,
+                                const int,
+                                const int,
+                                const GlobalCoordinate&,
+                                Evaluation&) const {}
 
     /*!
      * \brief Applies the initial solution for all degrees of freedom to which the model
@@ -1210,6 +1262,9 @@ public:
         asImp_().updateBegin();
         prePostProcessTimer_.stop();
 
+        asImp_().computeError();
+        asImp_().updateExactSolution();
+
         bool converged = false;
 
         try {
@@ -1278,6 +1333,19 @@ public:
      */
     void updateBegin()
     { }
+
+    /*!
+     * \brief Called by the update() method before it tries to
+     *        apply the newton method. Needed to compute exact solution
+     */
+    void updateExactSolution()
+    { }
+
+    void computeError()
+    {  }
+
+    void evalHigherOrder (const Element& element, const GlobalCoordinate& point, RangeType& result ) const
+    {}
 
     /*!
      * \brief Called by the update() method if it was
@@ -1735,6 +1803,10 @@ public:
             solution(timeIdx).resize(numDof);
 
         auxMod->applyInitial();
+
+#if DUNE_VERSION_NEWER( DUNE_FEM, 2, 7 )
+        space_.extendSize( asImp_().numAuxiliaryDof() );
+#endif
     }
 
     /*!
@@ -1910,6 +1982,8 @@ protected:
     mutable GlobalEqVector storageCache_[historySize];
 
     bool enableGridAdaptation_;
+    bool enableHigherOrder_;
+    bool reconstructOnlySolventOrPolymer_;
     bool enableIntensiveQuantityCache_;
     bool enableStorageCache_;
     bool enableThermodynamicHints_;

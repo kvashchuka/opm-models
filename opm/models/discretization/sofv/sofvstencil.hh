@@ -23,14 +23,12 @@
 /*!
  * \file
  *
- * \copydoc Opm::EcfvStencil
+ * \copydoc Opm::SofvStencil
  */
-#ifndef EWOMS_ECFV_STENCIL_HH
-#define EWOMS_ECFV_STENCIL_HH
+#ifndef EWOMS_SOFV_STENCIL_HH
+#define EWOMS_SOFV_STENCIL_HH
 
 #include <opm/models/utils/quadraturegeometries.hh>
-
-#include <opm/material/common/ConditionalStorage.hpp>
 
 #include <dune/grid/common/mcmgmapper.hh>
 #include <dune/grid/common/intersectioniterator.hh>
@@ -42,36 +40,42 @@
 
 namespace Opm {
 /*!
- * \ingroup EcfvDiscretization
+ * \ingroup SofvDiscretization
  *
  * \brief Represents the stencil (finite volume geometry) of a single
- *        element in the ECFV discretization.
+ *        element in the SOFV discretization.
  *
- * The ECFV discretization is a element centered finite volume
+ * The SOFV discretization is a element centered finite volume
  * approach. This means that each element corresponds to a control
  * volume.
  */
-template <class Scalar,
-          class GridView,
-          bool needFaceIntegrationPos = true,
-          bool needFaceNormal = true>
-class EcfvStencil
+template <class TypeTag>
+class SofvStencil
 {
+    typedef typename GET_PROP_TYPE(TypeTag, Scalar) Scalar;
+    typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
+
     enum { dimWorld = GridView::dimensionworld };
 
     typedef typename GridView::ctype CoordScalar;
     typedef typename GridView::Intersection Intersection;
     typedef typename GridView::template Codim<0>::Entity Element;
-
-#if DUNE_VERSION_NEWER(DUNE_GRID, 2,6)
-    typedef Dune::MultipleCodimMultipleGeomTypeMapper<GridView> ElementMapper;
-#else
-    typedef Dune::MultipleCodimMultipleGeomTypeMapper<GridView, Dune::MCMGElementLayout> ElementMapper;
+#if ! DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
+    typedef typename GridView::template Codim<0>::EntityPointer ElementPointer;
 #endif
+
+    //typedef Dune::MultipleCodimMultipleGeomTypeMapper<GridView,
+    //                                                  Dune::MCMGElementLayout> ElementMapper;
+
+    typedef typename GET_PROP_TYPE(TypeTag, DofMapper) DofMapper;
+    typedef DofMapper  ElementMapper;
 
     typedef Dune::FieldVector<CoordScalar, dimWorld> GlobalPosition;
 
     typedef Dune::FieldVector<Scalar, dimWorld> WorldVector;
+
+    const bool localRecons = EWOMS_GET_PARAM(TypeTag, bool, EnableLocalReconstruction);
+
 
 public:
     typedef Element        Entity;
@@ -95,16 +99,30 @@ public:
         SubControlVolume()
         {}
 
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
         SubControlVolume(const Element& element)
             : element_(element)
+#else
+        SubControlVolume(const ElementPointer& elementPtr)
+            : elementPtr_(elementPtr)
+#endif
         { update(); }
 
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
         void update(const Element& element)
         { element_ = element; }
+#else
+        void update(const ElementPointer& elementPtr)
+        { elementPtr_ = elementPtr; }
+#endif
 
         void update()
         {
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
             const auto& geometry = element_.geometry();
+#else
+            const auto& geometry = elementPtr_->geometry();
+#endif
             centerPos_ = geometry.center();
             volume_ = geometry.volume();
         }
@@ -130,41 +148,42 @@ public:
         /*!
          * \brief The geometry of the sub-control volume.
          */
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
         const LocalGeometry geometry() const
         { return element_.geometry(); }
-
-        /*!
-         * \brief Geometry of the sub-control volume relative to parent.
-         */
-        const LocalGeometry localGeometry() const
-        { return element_.geometryInFather(); }
+#else
+        const LocalGeometry geometry() const
+        { return elementPtr_->geometry(); }
+#endif
 
     private:
         GlobalPosition centerPos_;
         Scalar volume_;
+
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
         Element element_;
+#else
+        ElementPointer elementPtr_;
+#endif
     };
 
     /*!
      * \brief Represents a face of a sub-control volume.
      */
-    template <bool needIntegrationPos, bool needNormal>
-    class EcfvSubControlVolumeFace
+    class SubControlVolumeFace
     {
     public:
-        EcfvSubControlVolumeFace()
+        SubControlVolumeFace()
         {}
 
-        EcfvSubControlVolumeFace(const Intersection& intersection, unsigned localNeighborIdx)
+        SubControlVolumeFace(const Intersection& intersection, unsigned localNeighborIdx)
         {
             exteriorIdx_ = static_cast<unsigned short>(localNeighborIdx);
 
-            if (needNormal)
-                (*normal_) = intersection.centerUnitOuterNormal();
+            normal_ = intersection.centerUnitOuterNormal();
 
             const auto& geometry = intersection.geometry();
-            if (needIntegrationPos)
-                (*integrationPos_) = geometry.center();
+            integrationPos_ = geometry.center();
             area_ = geometry.volume();
         }
 
@@ -194,14 +213,14 @@ public:
          *        integration point.
          */
         const GlobalPosition& integrationPos() const
-        { return *integrationPos_; }
+        { return integrationPos_; }
 
         /*!
          * \brief Returns the outer unit normal at the face's
          *        integration point.
          */
         const WorldVector& normal() const
-        { return *normal_; }
+        { return normal_; }
 
         /*!
          * \brief Returns the area [m^2] of the face
@@ -210,35 +229,38 @@ public:
         { return area_; }
 
     private:
-        Opm::ConditionalStorage<needIntegrationPos, GlobalPosition> integrationPos_;
-        Opm::ConditionalStorage<needNormal, WorldVector> normal_;
+        GlobalPosition integrationPos_;
+        WorldVector normal_;
+
         Scalar area_;
 
         unsigned short exteriorIdx_;
     };
 
-    typedef EcfvSubControlVolumeFace<needFaceIntegrationPos, needFaceNormal> SubControlVolumeFace;
-    typedef EcfvSubControlVolumeFace</*needFaceIntegrationPos=*/true, needFaceNormal> BoundaryFace;
-
-    EcfvStencil(const GridView& gridView, const Mapper& mapper)
+    SofvStencil(const GridView& gridView, const Mapper& mapper)
         : gridView_(gridView)
         , elementMapper_(mapper)
-    {
-        // try to ensure that the mapper passed indeed maps elements
-        assert(int(gridView.size(/*codim=*/0)) == int(elementMapper_.size()));
-    }
+    { }
 
     void updateTopology(const Element& element)
     {
         auto isIt = gridView_.ibegin(element);
         const auto& endIsIt = gridView_.iend(element);
 
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
         // add the "center" element of the stencil
         subControlVolumes_.clear();
         subControlVolumes_.emplace_back(/*SubControlVolume(*/element/*)*/);
         elements_.clear();
         elements_.emplace_back(element);
-
+#else
+        // add the "center" element of the stencil
+        ElementPointer ePtr(element);
+        subControlVolumes_.clear();
+        subControlVolumes_.emplace_back(/*SubControlVolume(*/ePtr/*)*/);
+        elements_.clear();
+        elements_.emplace_back(ePtr);
+#endif
         interiorFaces_.clear();
         boundaryFaces_.clear();
 
@@ -256,15 +278,100 @@ public:
                 boundaryFaces_.emplace_back(/*SubControlVolumeFace(*/intersection, - 10000/*)*/);
             }
         }
+
+        numPrimaryDof_ = elements_.size();
+        if (localRecons) {
+            // add layer 2
+            //numPrimaryDof_ = elements_.size();
+            for (size_t dofIdx = 1; dofIdx < numPrimaryDof_; ++dofIdx) {
+                const Element& element = elements_[dofIdx];
+                auto isIt = gridView_.ibegin(element);
+                const auto& endIsIt = gridView_.iend(element);
+                for (; isIt != endIsIt; ++isIt) {
+                    const auto& intersection = *isIt;
+                    // if the current intersection has a neighbor, add a
+                    // degree of freedom and an internal face, else add a
+                    // boundary face
+                    if (intersection.neighbor()) {
+                        if (newElement(intersection.outside())) {
+                            elements_.emplace_back( intersection.outside() );
+                            subControlVolumes_.emplace_back(/*SubControlVolume(*/elements_.back()/*)*/);
+                            //interiorFaces_.emplace_back(/*SubControlVolumeFace(*/intersection, subControlVolumes_.size() - 1/*)*/);
+                        }
+                    }
+                    else {
+                        //boundaryFaces_.emplace_back(/*SubControlVolumeFace(*/intersection, - 10000/*)*/);
+                    }
+                }
+            }
+        } else {
+            //numPrimaryDof_ = 1;
+        }
+
+        globalToLocal_.clear();
+        const int nDofs = numDof();
+        for( int dof = 0; dof<nDofs; ++dof )
+        {
+            globalToLocal_.insert( std::make_pair( globalSpaceIndex( dof ), dof ) );
+        }
+
+        /*
+        differences_.clear();
+        const auto& center = subControlVolumes_[ 0 ].center();
+
+        const int nBnd = boundaryFaces_.size();
+        differences_.reserve( nDofs + nBnd );
+        for( int dof = 1; dof<nDofs; ++dof )
+        {
+            // store neighbor center - element center
+            differences_.push_back( subControlVolumes_[ dof ].center() );
+            differences_.back() -= center;
+        }
+
+        for( int bnd = 0; bnd < nBnd; ++bnd )
+        {
+            differences_.push_back( boundaryFaces_[ bnd ].integrationPos() );
+            differences_.back() -= center;
+        }
+        */
     }
 
     void updatePrimaryTopology(const Element& element)
     {
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
         // add the "center" element of the stencil
         subControlVolumes_.clear();
         subControlVolumes_.emplace_back(/*SubControlVolume(*/element/*)*/);
         elements_.clear();
         elements_.emplace_back(element);
+#else
+        // add the "center" element of the stencil
+        ElementPointer ePtr(element);
+        subControlVolumes_.clear();
+        subControlVolumes_.emplace_back(/*SubControlVolume(*/ePtr/*)*/);
+        elements_.clear();
+        elements_.emplace_back(ePtr);
+#endif
+
+//        interiorFaces_.clear();
+//        boundaryFaces_.clear();
+
+//        auto isIt = gridView_.ibegin(element);
+//        const auto& endIsIt = gridView_.iend(element);
+//        for (; isIt != endIsIt; ++isIt) {
+//            const auto& intersection = *isIt;
+//            // if the current intersection has a neighbor, add a
+//            // degree of freedom and an internal face, else add a
+//            // boundary face
+//            if (intersection.neighbor()) {
+//                elements_.emplace_back( intersection.outside() );
+//                subControlVolumes_.emplace_back(/*SubControlVolume(*/elements_.back()/*)*/);
+//                interiorFaces_.emplace_back(/*SubControlVolumeFace(*/intersection, subControlVolumes_.size() - 1/*)*/);
+//            }
+//            else {
+//                boundaryFaces_.emplace_back(/*SubControlVolumeFace(*/intersection, - 10000/*)*/);
+//            }
+//        }
     }
 
     void update(const Element& element)
@@ -309,17 +416,8 @@ public:
     size_t numPrimaryDof() const
     { return 1; }
 
-    /*!
-     * \brief Returns the number of extended degrees of freedom
-     *        which are contained by within the current element.
-     *
-     * Primary DOFs are always expected to have a lower index than
-     * "secondary" DOFs.
-     *
-     * For element centered finite elements, this is the central DOF,
-     * but can contain more.     */
     size_t numPrimaryDof2() const
-    { return 1; }
+    { return numPrimaryDof_; }
 
     /*!
      * \brief Return the global space index given the index of a degree of
@@ -329,7 +427,20 @@ public:
     {
         assert(0 <= dofIdx && dofIdx < numDof());
 
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
         return static_cast<unsigned>(elementMapper_.index(element(dofIdx)));
+#else
+        return static_cast<unsigned>(elementMapper_.map(element(dofIdx)));
+#endif
+    }
+
+    unsigned globalSpaceIndex(const Element& element) const
+    {
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
+        return static_cast<unsigned>(elementMapper_.index(element));
+#else
+        return static_cast<unsigned>(elementMapper_.map(element));
+#endif
     }
 
     /*!
@@ -349,7 +460,11 @@ public:
     {
         assert(0 <= dofIdx && dofIdx < numDof());
 
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
         return elements_[dofIdx];
+#else
+        return *elements_[dofIdx];
+#endif
     }
 
     /*!
@@ -378,8 +493,8 @@ public:
      * \brief Returns the face object belonging to a given face index
      *        in the interior of the domain.
      */
-    const SubControlVolumeFace& interiorFace(unsigned faceIdx) const
-    { return interiorFaces_[faceIdx]; }
+    const SubControlVolumeFace& interiorFace(unsigned bfIdx) const
+    { return interiorFaces_[bfIdx]; }
 
     /*!
      * \brief Returns the number of boundary faces of the stencil.
@@ -391,17 +506,57 @@ public:
      * \brief Returns the boundary face object belonging to a given
      *        boundary face index.
      */
-    const BoundaryFace& boundaryFace(unsigned bfIdx) const
+    const SubControlVolumeFace& boundaryFace(unsigned bfIdx) const
     { return boundaryFaces_[bfIdx]; }
+
+    size_t globalToLocal( const size_t globalSpaceIdx ) const
+    {
+        //auto item = globalToLocal_.find( globalSpaceIdx );
+        //assert( item != globalToLocal_.end() );
+        //return item->second;
+        return globalToLocal_.at( globalSpaceIdx );
+    }
+
+    size_t globalToLocal( const Element& element ) const
+    {
+        return globalToLocal( globalSpaceIndex( element ) );
+    }
+
+    /*
+    const std::vector<GlobalPosition>& differences() const {
+        return differences_;
+    }
+    */
+
+private:
+
+    bool newElement(const Element& element) const
+    {
+        for (auto& elem : elements_)
+            if(globalSpaceIndex(element) == globalSpaceIndex(elem))
+                return false;
+
+        return true;
+    }
 
 protected:
     const GridView&       gridView_;
     const ElementMapper&  elementMapper_;
 
+#if DUNE_VERSION_NEWER(DUNE_COMMON, 2, 4)
     std::vector<Element> elements_;
+#else
+    std::vector<ElementPointer> elements_;
+#endif
+    std::map< size_t, size_t > globalToLocal_;
+
     std::vector<SubControlVolume>      subControlVolumes_;
     std::vector<SubControlVolumeFace>  interiorFaces_;
-    std::vector<BoundaryFace>  boundaryFaces_;
+    std::vector<SubControlVolumeFace>  boundaryFaces_;
+
+    //std::vector<GlobalPosition> differences_;
+
+    size_t  numPrimaryDof_;
 };
 
 } // namespace Opm

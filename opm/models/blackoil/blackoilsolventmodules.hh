@@ -1389,11 +1389,16 @@ class BlackOilSolventExtensiveQuantities
     typedef typename GET_PROP_TYPE(TypeTag, ExtensiveQuantities) ExtensiveQuantities;
     typedef typename GET_PROP_TYPE(TypeTag, FluidSystem) FluidSystem;
     typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
+    typedef typename GET_PROP_TYPE(TypeTag, Indices) Indices;
 
     typedef Opm::MathToolbox<Evaluation> Toolbox;
 
     static constexpr unsigned gasPhaseIdx = FluidSystem::gasPhaseIdx;
     static constexpr int dimWorld = GridView::dimensionworld;
+    typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
+    enum { dimRange  = PrimaryVariables::dimension };
+    typedef Dune::FieldVector< Evaluation, dimRange > EvalRangeVector;
+
 
     typedef Dune::FieldVector<Scalar, dimWorld> DimVector;
     typedef Dune::FieldVector<Evaluation, dimWorld> DimEvalVector;
@@ -1518,6 +1523,11 @@ public:
         unsigned exteriorDofIdx = extQuants.exteriorIndex();
         assert(interiorDofIdx != exteriorDofIdx);
 
+        const bool higherOrder = elemCtx.model().enableHigherOrder();
+        const auto& stencil = elemCtx.stencil(timeIdx);
+        const auto& scvf = stencil.interiorFace(scvfIdx);
+
+
         const auto& intQuantsIn = elemCtx.intensiveQuantities(interiorDofIdx, timeIdx);
         const auto& intQuantsEx = elemCtx.intensiveQuantities(exteriorDofIdx, timeIdx);
 
@@ -1568,7 +1578,10 @@ public:
             return;
         }
 
+        const bool localRecons = EWOMS_GET_PARAM(TypeTag, bool, EnableLocalReconstruction);
+
         Scalar faceArea = elemCtx.stencil(timeIdx).interiorFace(scvfIdx).area();
+        /*
         const IntensiveQuantities& up = elemCtx.intensiveQuantities(solventUpstreamDofIdx_, timeIdx);
         if (solventUpstreamDofIdx_ == interiorDofIdx)
             solventVolumeFlux_ =
@@ -1580,6 +1593,38 @@ public:
                 Opm::scalarValue(up.solventMobility())
                 *(-trans/faceArea)
                 *pressureDiffSolvent;
+        */
+
+        if (!higherOrder) {
+            const IntensiveQuantities& up = elemCtx.intensiveQuantities(solventUpstreamDofIdx_, timeIdx);
+            if (solventUpstreamDofIdx_ == interiorDofIdx)
+                solventVolumeFlux_ =
+                        up.solventMobility()
+                        *(-trans/faceArea)
+                        *pressureDiffSolvent;
+            else
+                solventVolumeFlux_ =
+                        Opm::scalarValue(up.solventMobility())
+                        *(-trans/faceArea)
+                        *pressureDiffSolvent;
+        } else {
+            const IntensiveQuantities& up = elemCtx.intensiveQuantities(solventUpstreamDofIdx_, timeIdx);
+            auto mob = up.solventMobility();
+            if (Opm::scalarValue(mob) < 1e-6) {
+                solventVolumeFlux_ = 0.0;
+                return;
+            }
+            const auto& integrationPos = scvf.integrationPos();
+            // first evaluate both higher order functions
+            Evaluation upstreamMobilityLocal;
+            elemCtx.problem().model().evaluateReconstruction( elemCtx,
+                                                              solventUpstreamDofIdx_,
+                                                              FluidSystem::numPhases,
+                                                              integrationPos,
+                                                              upstreamMobilityLocal);
+            solventVolumeFlux_ = pressureDiffSolvent*upstreamMobilityLocal*(-trans/faceArea);
+        }
+
     }
 
     unsigned solventUpstreamIndex() const

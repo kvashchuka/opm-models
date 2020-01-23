@@ -131,6 +131,17 @@ class EcfvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef typename GET_PROP_TYPE(TypeTag, SolutionVector) SolutionVector;
     typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
     typedef typename GET_PROP_TYPE(TypeTag, Simulator) Simulator;
+    typedef typename GET_PROP_TYPE(TypeTag, ElementContext) ElementContext;
+    typedef typename GET_PROP_TYPE(TypeTag, Evaluation) Evaluation;
+    typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
+    typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
+    enum { dimDomain = GridType::dimensionworld };
+    typedef Dune::FieldVector<Evaluation, dimDomain> EvalDimVector;
+    typedef typename GridView::template Codim<0>::Entity EntityType;
+    // geometry type
+    typedef typename EntityType::Geometry GeometryType;
+    // global coordinates
+    typedef typename GeometryType::GlobalCoordinate GlobalCoordinateType;
 
 public:
     EcfvDiscretization(Simulator& simulator)

@@ -809,6 +809,20 @@ public:
     VtkMultiWriter& defaultVtkWriter() const
     { return defaultVtkWriter_; }
 
+
+    template <class Context>
+    Scalar exactWetSat (const Context& context, unsigned spaceIdx, unsigned timeIdx) const
+    {
+        return 0.0;
+    }
+
+
+    template <class Context>
+    Scalar exactWetPressure (const Context& context, unsigned spaceIdx, unsigned timeIdx) const
+    {
+        return 0.0;
+    }
+
 protected:
     Scalar nextTimeStepSize_;
 

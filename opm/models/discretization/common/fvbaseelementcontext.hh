@@ -157,7 +157,8 @@ public:
         // update the finite element geometry
         stencil_.updatePrimaryTopology(elem);
 
-        dofVars_.resize(stencil_.numPrimaryDof());
+        //dofVars_.resize(stencil_.numPrimaryDof());
+        dofVars_.resize(numPrimaryDof(/*timeIdx=*/ 0));
     }
 
     /*!

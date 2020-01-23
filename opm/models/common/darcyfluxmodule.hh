@@ -42,6 +42,14 @@
 
 #include <cmath>
 
+#if HAVE_DUNE_FEM
+#include <dune/fem/space/common/functionspace.hh>
+#include <dune/fem/space/finitevolume.hh>
+//#include "reconstruction.hh"
+//#include "limitermodel.hh"
+//#include "limiterutility.hh"
+#endif
+
 BEGIN_PROPERTIES
 
 NEW_PROP_TAG(MaterialLaw);
@@ -127,15 +135,32 @@ class DarcyExtensiveQuantities
     typedef typename GET_PROP_TYPE(TypeTag, ExtensiveQuantities) Implementation;
     typedef typename GET_PROP_TYPE(TypeTag, FluidSystem) FluidSystem;
     typedef typename GET_PROP_TYPE(TypeTag, MaterialLaw) MaterialLaw;
+    typedef typename GET_PROP_TYPE(TypeTag, Model) Model;
+
+    typedef typename GET_PROP_TYPE(TypeTag, Simulator) Simulator;
 
     enum { dimWorld = GridView::dimensionworld };
     enum { numPhases = GET_PROP_VALUE(TypeTag, NumPhases) };
 
     typedef typename Opm::MathToolbox<Evaluation> Toolbox;
     typedef typename FluidSystem::template ParameterCache<Evaluation> ParameterCache;
+    typedef Dune::FieldVector<Evaluation, numPhases> EvalPhaseVector;
     typedef Dune::FieldVector<Evaluation, dimWorld> EvalDimVector;
     typedef Dune::FieldVector<Scalar, dimWorld> DimVector;
     typedef Dune::FieldMatrix<Scalar, dimWorld, dimWorld> DimMatrix;
+
+
+    typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
+    typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
+
+    const bool localRecons = EWOMS_GET_PARAM(TypeTag, bool, EnableLocalReconstruction);
+
+    enum { dimDomain = GridType::dimensionworld };
+    enum { dimRange = PrimaryVariables::dimension}; //  };
+    //typedef Dune::FieldVector< Evaluation, dimRange > RangeType;
+    typedef Dune::FieldVector< Scalar, dimRange > RangeType;
+    typedef Dune::FieldVector< Evaluation, dimRange > EvalRangeVector;
+
 
 public:
     /*!
@@ -193,8 +218,12 @@ protected:
     {
         const auto& gradCalc = elemCtx.gradientCalculator();
         Opm::PressureCallback<TypeTag> pressureCallback(elemCtx);
+        //std::cout << elemCtx.model().discretizationName() << std::endl;
 
-        const auto& scvf = elemCtx.stencil(timeIdx).interiorFace(faceIdx);
+        const auto& stencil = elemCtx.stencil(timeIdx);
+        const auto& scvf = stencil.interiorFace(faceIdx);
+
+        //const auto& scvf = elemCtx.stencil(timeIdx).interiorFace(faceIdx);
         const auto& faceNormal = scvf.normal();
 
         unsigned i = scvf.interiorIndex();
@@ -202,6 +231,25 @@ protected:
         interiorDofIdx_ = static_cast<short>(i);
         exteriorDofIdx_ = static_cast<short>(j);
         unsigned focusDofIdx = elemCtx.focusDofIndex();
+
+        //std::cout << " interiorDofIdx_ " <<  interiorDofIdx_ << " exteriorDofIdx_  " <<  exteriorDofIdx_  << std::endl;
+        EvalRangeVector upstreamMobility( 0 );
+        Evaluation upstreamMobilityLocal;
+        EvalRangeVector downstreamMobility( 0 );
+
+        const bool higherOrder = elemCtx.model().enableHigherOrder();
+        /*
+        if( higherOrder )
+        {
+          //   first evaluate both higher order functions
+            elemCtx.problem().model().evaluateReconstruction( elemCtx,
+                                                              exteriorDofIdx_,
+                                                              integrationPos,
+                                                              upstreamMobility,
+                                                              downstreamMobility );
+
+        }
+        */
 
         // calculate the "raw" pressure gradient
         for (unsigned phaseIdx = 0; phaseIdx < numPhases; ++phaseIdx) {
@@ -312,6 +360,8 @@ protected:
             if (tmp > 0) {
                 upstreamDofIdx_[phaseIdx] = exteriorDofIdx_;
                 downstreamDofIdx_[phaseIdx] = interiorDofIdx_;
+                // in this case select downstream to be upstream
+                upstreamMobility[ phaseIdx ] = downstreamMobility[ phaseIdx ];
             }
             else {
                 upstreamDofIdx_[phaseIdx] = interiorDofIdx_;
@@ -320,11 +370,36 @@ protected:
 
             // we only carry the derivatives along if the upstream DOF is the one which
             // we currently focus on
+            /*
             const auto& up = elemCtx.intensiveQuantities(upstreamDofIdx_[phaseIdx], timeIdx);
             if (upstreamDofIdx_[phaseIdx] == static_cast<int>(focusDofIdx))
                 mobility_[phaseIdx] = up.mobility(phaseIdx);
             else
                 mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
+            */
+
+            // we currently focus on (needed with AD, in the case of automatic differentiation, all derivatives are with regard to
+            // the primary variables of that degree of freedom. Only "primary" DOFs can be
+            // focused on.)
+            if (! higherOrder) {
+               const auto &up = elemCtx.intensiveQuantities(upstreamDofIdx_[phaseIdx], timeIdx);
+                if (upstreamDofIdx_[phaseIdx] == static_cast<int>(focusDofIdx))
+                    mobility_[phaseIdx] = up.mobility(phaseIdx);
+                else
+                    mobility_[phaseIdx] = Toolbox::value(up.mobility(phaseIdx));
+            }
+            else {
+                    const auto& integrationPos = scvf.integrationPos();
+                    // first evaluate both higher order functions
+                    elemCtx.problem().model().evaluateReconstruction( elemCtx,
+                                                                      upstreamIndex_(phaseIdx),
+                                                                      phaseIdx,
+                                                                      integrationPos,
+                                                                      upstreamMobilityLocal);
+
+                    mobility_[phaseIdx] = upstreamMobilityLocal;
+            }
+
         }
     }
 

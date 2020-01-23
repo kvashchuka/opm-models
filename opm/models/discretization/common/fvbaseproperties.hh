@@ -182,6 +182,26 @@ NEW_PROP_TAG(Simulator);
 NEW_PROP_TAG(EnableGridAdaptation);
 
 /*!
+ * \brief Switch to enable or disable higher order schemes
+ */
+NEW_PROP_TAG(EnableHigherOrder);
+
+/*!
+ * \brief Switch to enable reconstruction for only solvent or polymer equation
+ */
+NEW_PROP_TAG(OnlyReconstructionForSolventOrPolymer);
+
+/*!
+ * \brief True if reconstruction is done locally.
+ */
+NEW_PROP_TAG(EnableLocalReconstruction);
+
+/*!
+ * \brief Integer id of selected reconstruction scheme.
+ */
+NEW_PROP_TAG(ReconstructionSchemeId);
+
+/*!
  * \brief The directory to which simulation output ought to be written to.
  */
 NEW_PROP_TAG(OutputDir);
@@ -314,7 +334,6 @@ NEW_PROP_TAG(ExtensiveStorageTerm);
 
 //! \brief Specify whether to use volumetric residuals or not
 NEW_PROP_TAG(UseVolumetricResidual);
-
 
 //! Specify if experimental features should be enabled or not.
 NEW_PROP_TAG(EnableExperiments);

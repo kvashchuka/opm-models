@@ -143,6 +143,9 @@ public:
         // intrinsic permeability
         intrinsicPerm_ = problem.intrinsicPermeability(elemCtx, dofIdx, timeIdx);
 
+        // exact wetting saturation
+        //exactWetSat_ = problem.exactWetSat(elemCtx, dofIdx, timeIdx);
+
         // energy related quantities
         EnergyIntensiveQuantities::update_(fluidState_, paramCache, elemCtx, dofIdx, timeIdx);
 
@@ -186,9 +189,22 @@ public:
     const Evaluation& porosity() const
     { return porosity_; }
 
+    //const Evaluation& exactWetSat() const
+    //{ return exactWetSat_; }
+
+    const Evaluation& solventMobility() const
+    { throw std::runtime_error("solventMobility() called but solvents are disabled"); }
+
+    const Evaluation& polymerConcentration() const
+    { throw std::runtime_error("polymerConcentration() called but polymer is disabled"); }
+
+
+
+
 protected:
     FluidState fluidState_;
     Evaluation porosity_;
+    Evaluation exactWetSat_;
     DimMatrix intrinsicPerm_;
     Evaluation relativePermeability_[numPhases];
     Evaluation mobility_[numPhases];

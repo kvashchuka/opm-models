@@ -143,6 +143,8 @@ protected:
                                                                   /*timeIdx=*/0,
                                                                   /*valid=*/false);
         }
+        // update reconstructions if enabled
+        model_().updateReconstruction();
     }
 
     /*!
