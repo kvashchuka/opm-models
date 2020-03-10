@@ -38,7 +38,6 @@
 #include <opm/parser/eclipse/Deck/Deck.hpp>
 #include <opm/parser/eclipse/EclipseState/EclipseState.hpp>
 #include <opm/parser/eclipse/EclipseState/Tables/PvtwsaltTable.hpp>
-#include <opm/parser/eclipse/EclipseState/Tables/BrineDensityTable.hpp>
 #endif
 
 #include <opm/material/common/Valgrind.hpp>
@@ -92,21 +91,21 @@ public:
     /*!
      * \brief Initialize all internal data structures needed by the brine module
      */
-    static void initFromDeck(const Opm::Deck& deck, const Opm::EclipseState& eclState)
+    static void initFromState(const Opm::EclipseState& eclState)
     {
         // some sanity checks: if brine are enabled, the BRINE keyword must be
         // present, if brine are disabled the keyword must not be present.
-        if (enableBrine && !deck.hasKeyword("BRINE")) {
+        if (enableBrine && !eclState.runspec().phases().active(Phase::BRINE)) {
             throw std::runtime_error("Non-trivial brine treatment requested at compile time, but "
                                      "the deck does not contain the BRINE keyword");
         }
-        else if (!enableBrine && deck.hasKeyword("BRINE")) {
+        else if (!enableBrine && eclState.runspec().phases().active(Phase::BRINE)) {
             throw std::runtime_error("Brine treatment disabled at compile time, but the deck "
                                      "contains the BRINE keyword");
         }
 
 
-        if (!deck.hasKeyword("BRINE"))
+        if (!eclState.runspec().phases().active(Phase::BRINE))
             return; // brine treatment is supposed to be disabled
 
         const auto& tableManager = eclState.getTableManager();
@@ -125,8 +124,7 @@ public:
                 const auto& bdensityTable = bdensityTables[pvtRegionIdx];
                 const auto& pvtwsaltTable = pvtwsaltTables[pvtRegionIdx];
                 const auto& c = pvtwsaltTable.getSaltConcentrationColumn();
-                const auto& density = bdensityTable.getBrineDensityColumn();
-                bdensityTable_[pvtRegionIdx].setXYContainers(c, density);
+                bdensityTable_[pvtRegionIdx].setXYContainers(c, bdensityTable);
             }
         }
     }
@@ -260,10 +258,10 @@ public:
     /*!
      * \brief Return how much a Newton-Raphson update is considered an error
      */
-    static Scalar computeUpdateError(const PrimaryVariables& oldPv OPM_OPTIM_UNUSED,
-                                     const EqVector& delta OPM_OPTIM_UNUSED)
+    static Scalar computeUpdateError(const PrimaryVariables& oldPv OPM_UNUSED,
+                                     const EqVector& delta OPM_UNUSED)
     {
-        // do not consider consider the cange of Brine primary variables for
+        // do not consider consider the change of Brine primary variables for
         // convergence
         // TODO: maybe this should be changed
         return static_cast<Scalar>(0.0);
