@@ -366,7 +366,7 @@ namespace Dune
             for( auto iit = gridView().ibegin( element ); iit != iend; ++iit, ++nbIndexLocal )
             {
               const auto intersection = *iit ;
-              const GlobalCoordinate iCenter = intersection.geometry().center();
+              //const GlobalCoordinate iCenter = intersection.geometry().center();
               if( intersection.boundary() )
               /*{
                 const GlobalCoordinate iNormal = intersection.centerUnitOuterNormal();
@@ -589,7 +589,7 @@ namespace Dune
         const auto iend = gridView().iend( element );
         for( auto iit = gridView().ibegin( element ); iit != iend; ++iit ) {
             const auto intersection = *iit;
-            const GlobalCoordinate iCenter = intersection.geometry().center();
+            //const GlobalCoordinate iCenter = intersection.geometry().center();
 
             if (intersection.neighbor()) {
                 const auto neighbor = intersection.outside();
