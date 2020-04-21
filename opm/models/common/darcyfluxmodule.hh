@@ -237,19 +237,15 @@ protected:
         Evaluation upstreamMobilityLocal;
         EvalRangeVector downstreamMobility( 0 );
 
-        const bool higherOrder = elemCtx.model().enableHigherOrder();
-        /*
+        bool higherOrder = elemCtx.model().enableHigherOrder();
+
+        // compare saturation differences of all saturations (water, gas)
         if( higherOrder )
         {
-          //   first evaluate both higher order functions
-            elemCtx.problem().model().evaluateReconstruction( elemCtx,
-                                                              exteriorDofIdx_,
-                                                              integrationPos,
-                                                              upstreamMobility,
-                                                              downstreamMobility );
-
+            // TODO: check difference is larger than threshold
+            // if ( difference > saturationDiffThres )
+            //    higherOrder = false ;
         }
-        */
 
         // calculate the "raw" pressure gradient
         for (unsigned phaseIdx = 0; phaseIdx < numPhases; ++phaseIdx) {
