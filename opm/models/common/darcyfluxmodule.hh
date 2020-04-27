@@ -161,6 +161,9 @@ class DarcyExtensiveQuantities
     typedef Dune::FieldVector< Scalar, dimRange > RangeType;
     typedef Dune::FieldVector< Evaluation, dimRange > EvalRangeVector;
 
+    typedef typename GridView::ctype CoordScalar;
+    typedef Dune::FieldVector<CoordScalar, dimWorld> GlobalPosition;
+
 
 public:
     /*!
@@ -231,6 +234,8 @@ protected:
         interiorDofIdx_ = static_cast<short>(i);
         exteriorDofIdx_ = static_cast<short>(j);
         unsigned focusDofIdx = elemCtx.focusDofIndex();
+
+        const GlobalPosition& pos = elemCtx.pos(i, timeIdx);
 
         //std::cout << " interiorDofIdx_ " <<  interiorDofIdx_ << " exteriorDofIdx_  " <<  exteriorDofIdx_  << std::endl;
         EvalRangeVector upstreamMobility( 0 );
@@ -342,6 +347,8 @@ protected:
         elemCtx.problem().intersectionIntrinsicPermeability(K_, elemCtx, faceIdx, timeIdx);
         Opm::Valgrind::CheckDefined(K_);
 
+      Evaluation saturationDifference_[numPhases];
+
         for (unsigned phaseIdx = 0; phaseIdx < numPhases; ++phaseIdx) {
             if (!elemCtx.model().phaseIsConsidered(phaseIdx)) {
                 Opm::Valgrind::SetUndefined(potentialGrad_[phaseIdx]);
@@ -363,6 +370,25 @@ protected:
                 upstreamDofIdx_[phaseIdx] = interiorDofIdx_;
                 downstreamDofIdx_[phaseIdx] = exteriorDofIdx_;
             }
+
+            //Evaluating saturation for adaptive higher order
+            const auto& intQuantsIn = elemCtx.intensiveQuantities(i, timeIdx);
+            const auto& intQuantsEx = elemCtx.intensiveQuantities(j, timeIdx);
+            bool higherOrder = elemCtx.model().enableHigherOrder();
+
+            const Evaluation& saturationInterior = intQuantsIn.fluidState().saturation(phaseIdx);
+            Evaluation saturationExterior = Toolbox::value(intQuantsEx.fluidState().saturation(phaseIdx));
+
+            saturationDifference_[phaseIdx] = saturationExterior - saturationInterior;
+
+            const double saturationThreshold = 1e-3;
+            auto test = saturationDifference_[phaseIdx] - saturationThreshold;
+
+            if ( ( saturationDifference_[phaseIdx] < saturationThreshold) && ( saturationDifference_[phaseIdx] > (0.0 - saturationThreshold)) ){
+                higherOrder = false;
+            }
+            else
+                std::cout << "saturationDifference_[phaseIdx] = " << saturationDifference_[phaseIdx] << ", global position " << pos << std::endl;
 
             // we only carry the derivatives along if the upstream DOF is the one which
             // we currently focus on
