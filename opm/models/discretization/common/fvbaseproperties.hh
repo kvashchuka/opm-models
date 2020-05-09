@@ -187,6 +187,11 @@ NEW_PROP_TAG(EnableGridAdaptation);
 NEW_PROP_TAG(EnableHigherOrder);
 
 /*!
+ * \brief Threshold for saturation difference
+ */
+NEW_PROP_TAG(SaturationDifferenceThreshold);
+
+/*!
  * \brief Switch to enable reconstruction for only solvent or polymer equation
  */
 NEW_PROP_TAG(OnlyReconstructionForSolventOrPolymer);

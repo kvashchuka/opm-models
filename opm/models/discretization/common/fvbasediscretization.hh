@@ -212,6 +212,9 @@ SET_BOOL_PROP(FvBaseDiscretization, EnableGridAdaptation, false);
 //! Disable higher order by default
 SET_BOOL_PROP(FvBaseDiscretization, EnableHigherOrder, false);
 
+//! Set default for saturation difference threshold
+SET_SCALAR_PROP(FvBaseDiscretization, SaturationDifferenceThreshold, 1e-3);
+
 //! By default do reconstruction for all equations if reconstruction is enabled
 SET_BOOL_PROP(FvBaseDiscretization, OnlyReconstructionForSolventOrPolymer, false);
 
@@ -460,6 +463,7 @@ public:
 
         EWOMS_REGISTER_PARAM(TypeTag, bool, EnableGridAdaptation, "Enable adaptive grid refinement/coarsening");
         EWOMS_REGISTER_PARAM(TypeTag, bool, EnableHigherOrder, "Enable higher order finite volume schemes");
+        EWOMS_REGISTER_PARAM(TypeTag, Scalar, SaturationDifferenceThreshold, "Set threshold for saturation difference" );
         EWOMS_REGISTER_PARAM(TypeTag, bool, OnlyReconstructionForSolventOrPolymer, "Enable higher order finite volume schemes for solvent or polymer equation only");
         EWOMS_REGISTER_PARAM(TypeTag, bool, EnableLocalReconstruction, "Enable local reconstruction");
         EWOMS_REGISTER_PARAM(TypeTag, int , ReconstructionSchemeId, "Reconstruction scheme id");
