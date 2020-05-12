@@ -1334,11 +1334,16 @@ class BlackOilSolventExtensiveQuantities
     enum { dimRange  = PrimaryVariables::dimension };
     typedef Dune::FieldVector< Evaluation, dimRange > EvalRangeVector;
 
+    typedef typename GridView::ctype CoordScalar;
+    typedef Dune::FieldVector<CoordScalar, dimWorld> GlobalPosition;
 
     typedef Dune::FieldVector<Scalar, dimWorld> DimVector;
     typedef Dune::FieldVector<Evaluation, dimWorld> DimEvalVector;
 
 public:
+    BlackOilSolventExtensiveQuantities() :
+            saturationDifferenceThreshold_( EWOMS_GET_PARAM(TypeTag, Scalar, SaturationDifferenceThreshold) )
+    {}
     /*!
      * \brief Method which calculates the volume flux of the polymer "phase" using the
      *        pressure potential gradient of the gas phase and the intrinsic permeability
@@ -1458,7 +1463,7 @@ public:
         unsigned exteriorDofIdx = extQuants.exteriorIndex();
         assert(interiorDofIdx != exteriorDofIdx);
 
-        const bool higherOrder = elemCtx.model().enableHigherOrder();
+        //const bool higherOrder = elemCtx.model().enableHigherOrder();
         const auto& stencil = elemCtx.stencil(timeIdx);
         const auto& scvf = stencil.interiorFace(scvfIdx);
 
@@ -1468,6 +1473,8 @@ public:
 
         unsigned I = elemCtx.globalSpaceIndex(interiorDofIdx, timeIdx);
         unsigned J = elemCtx.globalSpaceIndex(exteriorDofIdx, timeIdx);
+
+        const GlobalPosition& pos = elemCtx.pos(interiorDofIdx, timeIdx);
 
         Scalar thpres = elemCtx.problem().thresholdPressure(I, J);
         Scalar trans = elemCtx.problem().transmissibility(elemCtx, interiorDofIdx, exteriorDofIdx);
@@ -1530,6 +1537,22 @@ public:
                 *pressureDiffSolvent;
         */
 
+        bool higherOrder = elemCtx.model().enableHigherOrder();
+
+        const Evaluation& saturationInterior = intQuantsIn.fluidState().saturation(gasPhaseIdx);
+        Evaluation saturationExterior = Toolbox::value(intQuantsEx.fluidState().saturation(gasPhaseIdx));
+
+        Evaluation saturationDiffSolvent = saturationExterior - saturationInterior;
+
+        const double saturationThreshold = saturationDifferenceThreshold_;
+
+        if ( (std::abs(Opm::scalarValue(saturationDiffSolvent)) < saturationThreshold) ){
+            higherOrder = false;
+        }
+        //else
+        //    std::cout << "saturationDiffSolvent = " << saturationDiffSolvent << ", global position " << pos << std::endl;
+
+
         if (!higherOrder) {
             const IntensiveQuantities& up = elemCtx.intensiveQuantities(solventUpstreamDofIdx_, timeIdx);
             if (solventUpstreamDofIdx_ == interiorDofIdx)
@@ -1581,6 +1604,9 @@ private:
     Evaluation solventVolumeFlux_;
     unsigned solventUpstreamDofIdx_;
     unsigned solventDownstreamDofIdx_;
+
+    // threshold for selective higher order
+    const double saturationDifferenceThreshold_;
 };
 
 template <class TypeTag>
