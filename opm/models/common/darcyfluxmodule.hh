@@ -166,6 +166,10 @@ class DarcyExtensiveQuantities
 
 
 public:
+    DarcyExtensiveQuantities() :
+            saturationDifferenceThreshold_( EWOMS_GET_PARAM(TypeTag, Scalar, SaturationDifferenceThreshold) )
+    {}
+
     /*!
      * \brief Returns the intrinsic permeability tensor for a given
      *        sub-control volume face.
@@ -241,16 +245,6 @@ protected:
         EvalRangeVector upstreamMobility( 0 );
         Evaluation upstreamMobilityLocal;
         EvalRangeVector downstreamMobility( 0 );
-
-        bool higherOrder = elemCtx.model().enableHigherOrder();
-
-        // compare saturation differences of all saturations (water, gas)
-        if( higherOrder )
-        {
-            // TODO: check difference is larger than threshold
-            // if ( difference > saturationDiffThres )
-            //    higherOrder = false ;
-        }
 
         // calculate the "raw" pressure gradient
         for (unsigned phaseIdx = 0; phaseIdx < numPhases; ++phaseIdx) {
@@ -381,8 +375,7 @@ protected:
 
             saturationDifference_[phaseIdx] = saturationExterior - saturationInterior;
 
-            const double saturationThreshold = 1e-3;
-            auto test = saturationDifference_[phaseIdx] - saturationThreshold;
+            const double saturationThreshold = saturationDifferenceThreshold_;
 
             if ( ( saturationDifference_[phaseIdx] < saturationThreshold) && ( saturationDifference_[phaseIdx] > (0.0 - saturationThreshold)) ){
                 higherOrder = false;
@@ -637,6 +630,9 @@ private:
     const Implementation& asImp_() const
     { return *static_cast<const Implementation*>(this); }
 
+    // threshold for selective higher order
+    const double saturationDifferenceThreshold_;
+
 protected:
     // intrinsic permeability tensor and its square root
     DimMatrix K_;
@@ -659,6 +655,7 @@ protected:
     short downstreamDofIdx_[numPhases];
     short interiorDofIdx_;
     short exteriorDofIdx_;
+
 };
 
 } // namespace Opm
