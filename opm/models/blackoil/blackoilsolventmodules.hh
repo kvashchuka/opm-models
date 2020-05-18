@@ -1538,20 +1538,23 @@ public:
         */
 
         bool higherOrder = elemCtx.model().enableHigherOrder();
-
-        const Evaluation& saturationInterior = intQuantsIn.fluidState().saturation(gasPhaseIdx);
-        Evaluation saturationExterior = Toolbox::value(intQuantsEx.fluidState().saturation(gasPhaseIdx));
-
-        Evaluation saturationDiffSolvent = saturationExterior - saturationInterior;
-
         const double saturationThreshold = saturationDifferenceThreshold_;
 
-        if ( (std::abs(Opm::scalarValue(saturationDiffSolvent)) < saturationThreshold) ){
-            higherOrder = false;
-        }
-        //else
-        //    std::cout << "saturationDiffSolvent = " << saturationDiffSolvent << ", global position " << pos << std::endl;
+        if (higherOrder) {
+            if (std::abs(saturationThreshold ) > 0.0) {
 
+                const Evaluation& saturationInterior = intQuantsIn.fluidState().saturation(gasPhaseIdx);
+                Evaluation saturationExterior = Toolbox::value(intQuantsEx.fluidState().saturation(gasPhaseIdx));
+
+                Evaluation saturationDiffSolvent = saturationExterior - saturationInterior;
+
+                if ( (std::abs(Opm::scalarValue(saturationDiffSolvent)) < saturationThreshold) ){
+                    higherOrder = false;
+                }
+                //else
+                //    std::cout << "saturationDiffSolvent = " << saturationDiffSolvent << ", global position " << pos << std::endl;
+            }
+        }
 
         if (!higherOrder) {
             const IntensiveQuantities& up = elemCtx.intensiveQuantities(solventUpstreamDofIdx_, timeIdx);

@@ -365,23 +365,27 @@ protected:
                 downstreamDofIdx_[phaseIdx] = exteriorDofIdx_;
             }
 
-            //Evaluating saturation for adaptive higher order
-            const auto& intQuantsIn = elemCtx.intensiveQuantities(i, timeIdx);
-            const auto& intQuantsEx = elemCtx.intensiveQuantities(j, timeIdx);
             bool higherOrder = elemCtx.model().enableHigherOrder();
-
-            const Evaluation& saturationInterior = intQuantsIn.fluidState().saturation(phaseIdx);
-            Evaluation saturationExterior = Toolbox::value(intQuantsEx.fluidState().saturation(phaseIdx));
-
-            saturationDifference_[phaseIdx] = saturationExterior - saturationInterior;
-
             const double saturationThreshold = saturationDifferenceThreshold_;
 
-            if ( ( saturationDifference_[phaseIdx] < saturationThreshold) && ( saturationDifference_[phaseIdx] > (0.0 - saturationThreshold)) ){
-                higherOrder = false;
+            if (higherOrder) {
+                if (std::abs(saturationThreshold ) > 0.0) {
+
+                    //Evaluating saturation for adaptive higher order
+                    const auto &intQuantsIn = elemCtx.intensiveQuantities(i, timeIdx);
+                    const auto &intQuantsEx = elemCtx.intensiveQuantities(j, timeIdx);
+
+                    const Evaluation &saturationInterior = intQuantsIn.fluidState().saturation(phaseIdx);
+                    Evaluation saturationExterior = Toolbox::value(intQuantsEx.fluidState().saturation(phaseIdx));
+
+                    saturationDifference_[phaseIdx] = saturationExterior - saturationInterior;
+
+                    if ((saturationDifference_[phaseIdx] < saturationThreshold) &&
+                        (saturationDifference_[phaseIdx] > (0.0 - saturationThreshold))) {
+                        higherOrder = false;
+                    }
+                }
             }
-            else
-                std::cout << "saturationDifference_[phaseIdx] = " << saturationDifference_[phaseIdx] << ", global position " << pos << std::endl;
 
             // we only carry the derivatives along if the upstream DOF is the one which
             // we currently focus on

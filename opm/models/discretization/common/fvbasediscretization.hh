@@ -213,7 +213,7 @@ SET_BOOL_PROP(FvBaseDiscretization, EnableGridAdaptation, false);
 SET_BOOL_PROP(FvBaseDiscretization, EnableHigherOrder, false);
 
 //! Set default for saturation difference threshold
-SET_SCALAR_PROP(FvBaseDiscretization, SaturationDifferenceThreshold, 1e-3);
+SET_SCALAR_PROP(FvBaseDiscretization, SaturationDifferenceThreshold, 0.0);
 
 //! By default do reconstruction for all equations if reconstruction is enabled
 SET_BOOL_PROP(FvBaseDiscretization, OnlyReconstructionForSolventOrPolymer, false);
