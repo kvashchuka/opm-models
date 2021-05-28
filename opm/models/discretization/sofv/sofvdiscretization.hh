@@ -79,6 +79,7 @@ SET_TYPE_PROP(SofvDiscretization, GridCommHandleFactory,
               Opm::SofvGridCommHandleFactory<TypeTag>);
 
 //! Set the DiscreteFunctionSpace
+/*
 SET_PROP(SofvDiscretization, DiscreteFunctionSpace)
 {
 private:
@@ -92,6 +93,7 @@ private:
 public:
     typedef Dune::Fem::FiniteVolumeSpace< FunctionSpace, GridPart, 0 > type;
 };
+*/
 
 //SET_BOOL_PROP(SofvDiscretization, EnableHigherOrder, false);
 
@@ -139,7 +141,7 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef typename GET_PROP_TYPE(TypeTag, GridView) GridView;
     typedef typename GET_PROP_TYPE(TypeTag, Simulator) Simulator;
     typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
-    typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
+    //typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
     typedef typename GET_PROP_TYPE(TypeTag, FluidSystem) FluidSystem;
     typedef typename GET_PROP_TYPE(TypeTag, DiscreteFunctionSpace) DiscreteFunctionSpaceType;
     typedef typename GET_PROP_TYPE(TypeTag, ThreadManager) ThreadManager;
@@ -160,20 +162,18 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef Dune::FieldVector< Scalar, dimRange >      Vector;
 
     // intersection iterator type
-    typedef typename GridPartType::IntersectionIteratorType IntersectionIteratorType;
+    typedef typename GridView::IntersectionIterator IntersectionIteratorType;
     // intersection type
     typedef typename IntersectionIteratorType::Intersection IntersectionType;
     // geometry of intersection
     typedef typename IntersectionType::Geometry IntersectionGeometryType;
 
-
-    typedef typename DiscreteFunctionSpaceType :: FunctionSpaceType  FunctionSpaceType;
-    typedef typename FunctionSpaceType :: DomainType                 DomainType;
-    typedef typename FunctionSpaceType :: DomainFieldType            DomainFieldType;
-    typedef typename FunctionSpaceType :: RangeType                  RangeType;
-    typedef typename FunctionSpaceType :: RangeFieldType             RangeFieldType;
-
     typedef Dune::Fem::LimitedReconstruction< TypeTag > ReconstructionType;
+
+    typedef typename ReconstructionType :: DomainType         DomainType;
+    typedef typename ReconstructionType :: DomainFieldType    DomainFieldType;
+    typedef typename ReconstructionType :: RangeType          RangeType;
+    typedef typename ReconstructionType :: RangeFieldType     RangeFieldType;
 
     typedef typename ReconstructionType::LocalFunctionType  ReconstructedLocalFunctionType;
 

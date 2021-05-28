@@ -66,6 +66,7 @@ SET_TYPE_PROP(WenoDiscretization, DiscBaseOutputModule,
               Opm::SofvBaseOutputModule<TypeTag>);
 
 //! Set the DiscreteFunctionSpace
+/*
 SET_PROP(WenoDiscretization, DiscreteFunctionSpace)
 {
     private:
@@ -79,6 +80,7 @@ SET_PROP(WenoDiscretization, DiscreteFunctionSpace)
     public:
     typedef Dune::Fem::FiniteVolumeSpace< FunctionSpace, GridPart, 0 > type;
 };
+*/
 
 //! The class to create grid communication handles
 SET_TYPE_PROP(WenoDiscretization, GridCommHandleFactory,

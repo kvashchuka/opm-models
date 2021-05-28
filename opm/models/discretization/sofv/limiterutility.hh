@@ -10,50 +10,32 @@
 #include <dune/grid/common/grid.hh>
 #include <dune/grid/io/file/dgfparser/entitykey.hh>
 
-#include <dune/fem/gridpart/common/capabilities.hh>
-#include <dune/fem/io/parameter.hh>
-
-#include <dune/fem/operator/1order/localmassmatrix.hh>
-#include <dune/fem/common/typeindexedtuple.hh>
-#include <dune/fem/pass/localdg/discretemodel.hh>
-#include <dune/fem/pass/localdg.hh>
-
-#include <dune/fem/space/common/basesetlocalkeystorage.hh>
-
-#include <dune/fem/space/discontinuousgalerkin.hh>
-#include <dune/fem/space/finitevolume.hh>
-#include <dune/fem/space/lagrange/lagrangepoints.hh>
-
-#include <dune/fem/function/adaptivefunction.hh>
-
-#include <dune/fem/misc/compatibility.hh>
-
 //*************************************************************
 namespace Dune
 {
+
 namespace Fem
 {
 
-  template< class FunctionSpace, int dimGrd = FunctionSpace::dimDomain >
+  template< class DomainField, class RangeField, int dimD, int dimR >
   struct LimiterUtility
   {
-    typedef FunctionSpace  FunctionSpaceType;
-    typedef typename FunctionSpaceType :: DomainType      DomainType;
-    typedef typename FunctionSpaceType :: DomainFieldType DomainFieldType;
-    typedef typename FunctionSpaceType :: RangeType       RangeType;
-    typedef typename FunctionSpaceType :: RangeFieldType  RangeFieldType;
+    typedef RangeField   RangeFieldType;
+    typedef DomainField  DomainFieldType;
+
     typedef Opm::MathToolbox<RangeFieldType> Toolbox;
 
+    static const int dimRange  = dimR;
+    static const int dimDomain = dimD;
+    static const int dimGrid   = dimDomain;
 
-    static const int dimRange  = FunctionSpaceType :: dimRange;
-    static const int dimDomain = FunctionSpaceType :: dimDomain;
-    static const int dimGrid   = dimGrd;
+    typedef FieldVector< RangeFieldType, dimRange   > RangeType;
+    typedef FieldVector< DomainFieldType, dimDomain > DomainType;
 
     typedef FieldMatrix< DomainFieldType, dimRange,  dimDomain > GradientType;
     typedef FieldMatrix< RangeFieldType, dimRange,  dimDomain > GradientEvalType;
     typedef FieldVector< RangeFieldType, dimDomain > SingleGradientEvalType;
     typedef FieldMatrix< DomainFieldType, dimDomain, dimDomain > MatrixType;
-
 
     typedef DGFEntityKey<int> KeyType;
     typedef std::vector<int> CheckType;
@@ -179,7 +161,6 @@ namespace Fem
                                std::vector< int >& numbers,
                                std::vector< RangeType >& factors )
     {
-      static const int dimRange = FunctionSpaceType :: dimRange ;
       if( numbers.empty() )
       {
         assert( gradients.size() > 0 );
@@ -1244,7 +1225,8 @@ namespace Fem
     static double getEpsilon()
     {
       // default value is 1e-8
-      return Parameter::getValue("femdg.limiter.limiteps", double(1e-8) );
+      return 1e-8;
+      // Parameter::getValue("femdg.limiter.limiteps", double(1e-8) );
     }
 
     //! return epsilon for limiting

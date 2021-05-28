@@ -1,8 +1,8 @@
 #ifndef DUNE_FEM_LIMITER_HH
 #define DUNE_FEM_LIMITER_HH
 
-#include <dune/fem/space/finitevolume.hh>
-#include <dune/fem/io/parameter.hh>
+//#include <dune/fem/space/finitevolume.hh>
+//#include <dune/fem/io/parameter.hh>
 
 #include <opm/material/densead/Evaluation.hpp>
 
@@ -48,24 +48,16 @@ namespace Fem
     typedef Opm::MathToolbox<Evaluation> Toolbox;
 
 
-    //typedef Evaluation Field;
-    typedef DomainFieldType  Field; //can be Scalar
+    typedef LimiterUtility< DomainFieldType, Evaluation, dimDomain, dimRange >  LimiterUtilityType;
 
-    typedef Dune::Fem::FunctionSpace< Field, Evaluation, dimDomain, dimRange >   FunctionSpaceType;
-    //typedef Dune::Fem::FunctionSpace< Field, Field, dimDomain, dimRange>   FunctionSpaceType;
+    typedef typename LimiterUtilityType :: RangeFieldType   RangeFieldType;
+    typedef typename LimiterUtilityType :: RangeType        RangeType;
 
-    typedef typename FunctionSpaceType :: RangeFieldType   RangeFieldType;
-    typedef typename FunctionSpaceType :: RangeType        RangeType;
+    typedef typename LimiterUtilityType :: DomainType       DomainType;
 
-    //typedef Dune::FieldVector< DomainFieldType, dimDomain > DomainType;
-    typedef typename FunctionSpaceType :: DomainType       DomainType;
-
-    //typedef LimiterModel< GridPartType, dimRange >         LimiterModelType;
-
-    typedef std::vector<Dune::FieldVector< Evaluation, dimRange >>      SolutionVector;
+    typedef std::vector< Dune::FieldVector< Evaluation, dimRange > >      SolutionVector;
 
 
-    typedef LimiterUtility< FunctionSpaceType, GridType :: dimension >  LimiterUtilityType;
     typedef typename LimiterUtilityType :: GradientEvalType             GradientEvalType;
     typedef typename LimiterUtilityType :: SingleGradientEvalType       SingleGradientEvalType;
     typedef typename LimiterUtilityType :: CheckType         CheckType;
@@ -83,7 +75,7 @@ namespace Fem
     typedef typename LimiterUtilityType::MatrixStorage MatrixCacheEntry;
     typedef std::map< KeyType, MatrixCacheEntry > MatrixCacheType;
 
-    static const bool StructuredGrid     = GridPartCapabilities::isCartesian< GridPartType >::v;
+    static const bool StructuredGrid     = false; //GridPartCapabilities::isCartesian< GridPartType >::v;
 
     //! type of cartesian grid checker
     typedef CheckCartesian< GridPartType >  CheckCartesianType;
@@ -262,6 +254,11 @@ namespace Fem
 */
       else
       {
+        // not implemented anymore
+        assert( false );
+        std::abort();
+
+        /*
         assert( schemeId == secondRecon );
         if( recompute )
         {
@@ -273,6 +270,7 @@ namespace Fem
         {
           //applyLocal( *it, U, recompute );
         }
+        */
       }
     }
 
