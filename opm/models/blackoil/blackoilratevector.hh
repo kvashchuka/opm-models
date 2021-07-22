@@ -65,14 +65,16 @@ class BlackOilRateVector
     enum { numComponents = GET_PROP_VALUE(TypeTag, NumComponents) };
     enum { conti0EqIdx = Indices::conti0EqIdx };
     enum { contiEnergyEqIdx = Indices::contiEnergyEqIdx };
-    enum { enableEnergy = getPropValue<TypeTag, Properties::EnableEnergy>() };
-    enum { enableSolvent = getPropValue<TypeTag, Properties::EnableSolvent>() };
-    enum { enablePolymer = getPropValue<TypeTag, Properties::EnablePolymer>() };
-    enum { enablePolymerMolarWeight = getPropValue<TypeTag, Properties::EnablePolymerMW>() };
-    enum { enableFoam = getPropValue<TypeTag, Properties::EnableFoam>() };
-    enum { enableBrine = getPropValue<TypeTag, Properties::EnableBrine>() };
-    using Toolbox = Opm::MathToolbox<Evaluation>;
-    using ParentType = Dune::FieldVector<Evaluation, numEq>;
+    enum { enableEnergy = GET_PROP_VALUE(TypeTag, EnableEnergy) };
+    enum { enableSolvent = GET_PROP_VALUE(TypeTag, EnableSolvent) };
+    enum { enablePolymer = GET_PROP_VALUE(TypeTag, EnablePolymer) };
+    enum { enablePolymerMolarWeight = GET_PROP_VALUE(TypeTag, EnablePolymerMW) };
+    enum { enableFoam = GET_PROP_VALUE(TypeTag, EnableFoam) };
+    enum { enableBrine = GET_PROP_VALUE(TypeTag, EnableBrine) };
+
+    typedef Opm::MathToolbox<Evaluation> Toolbox;
+    typedef Dune::FieldVector<Evaluation, numEq> ParentType;
+
 
 public:
     BlackOilRateVector() : ParentType()
