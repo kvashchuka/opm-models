@@ -227,7 +227,32 @@ public:
         double errorL1_Pressure = 0.0;
         double errorL2 = 0.0;
         auto count = 0;
+        int total_count = 0;
         auto total_volume = 0.0;
+        auto checkSatisPhysical = true;
+
+        if (checkSatisPhysical) {
+            const auto & gridView = simulator_.gridView();
+            auto elemIt = gridView.template begin</*codim=*/0>();
+            const auto& elemEndIt = gridView.template end</*codim=*/0>();
+            for (; elemIt != elemEndIt; ++elemIt) {
+                const auto& elem = *elemIt;
+
+                // deal with the current element
+                elemCtx.updatePrimaryStencil(elem);
+
+                for (unsigned dofIdx = 0; dofIdx < elemCtx.numPrimaryDof(timeIdx); dofIdx++) {
+                    unsigned globalIdx = elemCtx.globalSpaceIndex(dofIdx, timeIdx);
+
+                    if (solution[globalIdx][1] > 1.0 || solution[globalIdx][1] < 0.0){
+                        std::cout << "Unphysical solution detected! Value = " << solution[globalIdx][1] << ", global Index " << globalIdx;
+                        std::cout << ", time " << time << std::endl;
+                        total_count ++;
+                    }
+
+                }
+            }
+        }
 
         if (std::abs(time - simulator_.endTime()) < 1.0) {
             // iterate through the grid and evaluate error
@@ -255,15 +280,16 @@ public:
                     errorL1_Pressure += std::abs(exactWetPressure - solution[globalIdx][0]) * volume;
                     errorL2 += std::abs(exactWetSaturation - solution[globalIdx][1]) * std::abs(exactWetSaturation - solution[globalIdx][1]) * volume;
 
-                    if (std::abs(solution[globalIdx][1]) > 1.0 + eps_)
-                    count++;
+                    if (solution[globalIdx][1] > 1.0 || solution[globalIdx][1] < 0.0)
+                        count++;
 
                 }
             }
 
             std::cout << " Error-L1 = " << errorL1 << std::endl;
             std::cout << " Error-L2 = " << std::sqrt(errorL2) << std::endl;
-            std::cout << " Number of false solutions " << count << std::endl;
+            std::cout << " Total number of unphysical saturation solutions obtained during the whole simulation " << total_count << std::endl;
+            std::cout << " Number of unphysical saturation solutions on the final time step " << count << std::endl;
             std::cout << " Total volume " << total_volume << std::endl;
             std::cout << " pressure_error = " << (errorL1_Pressure*100)/1e5 << std::endl;
         }

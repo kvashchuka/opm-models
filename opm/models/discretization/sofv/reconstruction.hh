@@ -468,6 +468,7 @@ namespace Fem
 
       bool operator() ( const int r, const DomainType& gradient ) const
       {
+        std::cout << " Solution is NOT checked to be physical in operator()!! "  << std::endl;
         return true;
         /*
         const int nCorners = points_.size();
@@ -822,6 +823,7 @@ namespace Fem
         if( ! model_.problem().physical( value ) )
           return false ;
       }*/
+      std::cout << " Solution is NOT checked to be physical in checkPhysical func!! "  << std::endl;
       return true;
 
     }
