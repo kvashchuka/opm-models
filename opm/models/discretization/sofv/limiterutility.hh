@@ -304,9 +304,6 @@ namespace Fem
     {
       typedef Entity EntityType;
 
-      //! type of cartesian grid checker
-      typedef CheckCartesian< GridPart >  CheckCartesianType;
-
       // get local references
       std::vector< DomainType >& barys  = baryCenters;
       std::vector< RangeType >&  nbVals = neighborValues;
@@ -332,13 +329,6 @@ namespace Fem
 
         const bool hasBoundary = intersection.boundary();
         const bool hasNeighbor = intersection.neighbor();
-
-        // check cartesian
-        if( !StructuredGrid && flags.cartesian )
-        {
-          // check whether this element is really cartesian
-          flags.cartesian &= ( ! CheckCartesianType::checkIntersection(intersection) );
-        }
 
         DomainType lambda( 1 );
         RangeType neighborValue( 0 );
@@ -545,9 +535,6 @@ namespace Fem
                          std::vector< DomainType >& baryCentersFull,
                          std::vector< RangeType  >& neighborValuesFull )
     {
-      //! type of cartesian grid checker
-      typedef CheckCartesian< GridPart >  CheckCartesianType;
-
       // get local references
       std::vector< DomainType >& barys  = baryCenters;
       std::vector< RangeType >&  nbVals = neighborValues;
@@ -580,10 +567,9 @@ namespace Fem
         const bool hasNeighbor = intersection.neighbor();
 
         // check cartesian
-        if( !StructuredGrid && flags.cartesian )
+        if( !StructuredGrid )
         {
-          // check whether this element is really cartesian
-          flags.cartesian &= ( ! CheckCartesianType::checkIntersection(intersection) );
+          flags.cartesian = false;
         }
 
         DomainType lambda( 1 );

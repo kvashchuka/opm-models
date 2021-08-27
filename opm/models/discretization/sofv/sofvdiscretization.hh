@@ -41,9 +41,6 @@
 
 #include <opm/models/io/vtkblackoilsolventmodule.hh>
 
-#if HAVE_DUNE_FEM
-#include <dune/fem/space/common/functionspace.hh>
-#include <dune/fem/space/finitevolume.hh>
 #include "reconstruction.hh"
 #include "limiterutility.hh"
 
@@ -143,7 +140,7 @@ class SofvDiscretization : public FvBaseDiscretization<TypeTag>
     typedef typename GET_PROP_TYPE(TypeTag, Grid) GridType;
     //typedef typename GET_PROP_TYPE(TypeTag, GridPart) GridPartType;
     typedef typename GET_PROP_TYPE(TypeTag, FluidSystem) FluidSystem;
-    typedef typename GET_PROP_TYPE(TypeTag, DiscreteFunctionSpace) DiscreteFunctionSpaceType;
+    //typedef typename GET_PROP_TYPE(TypeTag, DiscreteFunctionSpace) DiscreteFunctionSpaceType;
     typedef typename GET_PROP_TYPE(TypeTag, ThreadManager) ThreadManager;
 
     //enum { wettingPhaseIdx = FluidSystem::wettingPhaseIdx };
@@ -193,7 +190,7 @@ public:
 
     SofvDiscretization(Simulator& simulator)
         : ParentType(simulator),
-          reconstruction_(simulator.vanguard().gridPart(), dofMapper())
+          reconstruction_(simulator.vanguard().gridView(), dofMapper())
     {
         localTotalMobility_.resize( ThreadManager::maxThreads() );
     }
@@ -598,8 +595,6 @@ private:
 //    template <class TypeTag>
 //    using SofvDiscretization = EcfvDiscretization< TypeTag >;
 //} // namespace Opm
-
-#endif // #if HAVE_DUNE_FEM
 
 
 #endif

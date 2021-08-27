@@ -8,7 +8,6 @@
 
 #include <dune/fv/leastsquaresreconstruction.hh>
 #include <dune/fv/lpreconstruction.hh>
-//#include <dune/fv/qpreconstruction.hh>
 
 #include "limiterutility.hh"
 
@@ -29,7 +28,6 @@ namespace Fem
   public:
     typedef typename GET_PROP_TYPE(TypeTag, Grid)             GridType;
     typedef typename GET_PROP_TYPE(TypeTag, GridView)         GridViewType;
-    typedef typename GET_PROP_TYPE(TypeTag, GridPart)         GridPartType;
     typedef typename GET_PROP_TYPE(TypeTag, DofMapper)        DofMapper;
     typedef typename GET_PROP_TYPE(TypeTag, PrimaryVariables) PrimaryVariables;
     typedef typename GET_PROP_TYPE(TypeTag, Evaluation)       Evaluation;
@@ -46,7 +44,6 @@ namespace Fem
 
     typedef Dune::FieldVector< Evaluation, dimRange >         EvalDimVector;
     typedef Opm::MathToolbox<Evaluation> Toolbox;
-
 
     typedef LimiterUtility< DomainFieldType, Evaluation, dimDomain, dimRange >  LimiterUtilityType;
 
@@ -69,16 +66,13 @@ namespace Fem
     typedef MinModLimiter< Evaluation > LimiterFunctionType;
     //typedef SuperBeeLimiter< Field > LimiterFunctionType;
 
-    typedef typename GridPartType :: template Codim< 0 > :: EntityType   EntityType;
+    typedef typename GridViewType :: template Codim< 0 > :: Entity       EntityType;
     typedef typename EntityType :: Geometry                              Geometry;
 
     typedef typename LimiterUtilityType::MatrixStorage MatrixCacheEntry;
     typedef std::map< KeyType, MatrixCacheEntry > MatrixCacheType;
 
-    static const bool StructuredGrid     = false; //GridPartCapabilities::isCartesian< GridPartType >::v;
-
-    //! type of cartesian grid checker
-    typedef CheckCartesian< GridPartType >  CheckCartesianType;
+    static const bool StructuredGrid     = false;
 
     enum ReconstructionScheme
     {
@@ -91,8 +85,12 @@ namespace Fem
 
     static ReconstructionScheme getReconstructionSchemeId()
     {
+#if HAVE_DUNE_FEM
       static const std::string reconstructions[] = { "1st", "2nd-R", "2nd-LS", "2nd-LP", "2nd-QP" };
       return (ReconstructionScheme) Dune::Fem::Parameter::getEnum( "finitevolume.reconstruction", reconstructions );
+#else
+      return secondLP;
+#endif
     }
 
     static const std::string& schemeName (const int scheme)
@@ -125,27 +123,23 @@ namespace Fem
     //typedef Dune::FV::QPReconstruction< GridViewType, RangeType, BoundaryValue > QuadraticProgramming;
 
   public:
-    LimitedReconstruction( const GridPartType &gridPart, const DofMapper& dofMapper)
-      : gridPart_( gridPart )
+    LimitedReconstruction( const GridViewType &gridView, const DofMapper& dofMapper)
+      : gridView_( gridView )
       , dofMapper_( dofMapper )
-      , lsRecon_( static_cast< GridViewType > (gridPart_), BoundaryValue( *this ) )
-      , lsReconLocal_( static_cast< GridViewType > (gridPart_), BoundaryValue( *this ) )
-      , linProg_( static_cast< GridViewType > (gridPart_), BoundaryValue( *this )
-                  , Dune::Fem::Parameter::getValue<double>("finitevolume.linearprogramming.tol", 1e-8 ) )
-      //, quadProg_( static_cast< GridViewType > (gridPart_), BoundaryValue( *this )
-      //            , Dune::Fem::Parameter::getValue<double>("finitevolume.linearprogramming.tol", 1e-8 ) )
+      , lsRecon_( gridView_, BoundaryValue( *this ) )
+      , lsReconLocal_( gridView, BoundaryValue( *this ) )
+      , linProg_( gridView_, BoundaryValue( *this ), 1e-8 )
       , limiterFunction_()
       , storedComboSets_()
-      , matrixCacheVec_( gridPart_.grid().maxLevel() + 1 )
-      , cartesianGrid_( CheckCartesianType::check( gridPart_ ) )
+      , matrixCacheVec_( gridView_.grid().maxLevel() + 1 )
+      , cartesianGrid_( false )
     {
       time_ = 0;
 
+      const double linProTol = 1e-8;
       for( unsigned int i=0; i<ThreadManager::maxThreads(); ++i )
       {
-        linProgLocal_.push_back(
-            LinearProgrammingLocal( static_cast< GridViewType > (gridPart_), BoundaryValue( *this )
-                                  , Dune::Fem::Parameter::getValue<double>("finitevolume.linearprogramming.tol", 1e-8 ) ) );
+        linProgLocal_.push_back( LinearProgrammingLocal( gridView_, BoundaryValue( *this ), linProTol ) );
       }
     }
 
@@ -162,11 +156,11 @@ namespace Fem
       time_ = 0;//time;
 
       ElementContext elemCtx(simulator);
-      const size_t sizeGrid = gridPart_.indexSet().size( 0 ) ;
+      const size_t sizeGrid = gridView_.indexSet().size( 0 ) ;
       elemCounter_.resize(sizeGrid);
-      size_t size = 0; //gridPart_.indexSet().size( 0 ) ;
-      const auto end = gridPart_.template end< 0, Dune::Interior_Partition >();
-      for( auto it = gridPart_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
+      size_t size = 0; //gridView_.indexSet().size( 0 ) ;
+      const auto end = gridView_.template end< 0, Dune::Interior_Partition >();
+      for( auto it = gridView_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
       {
         const auto& entity = *it ;
         elemCtx.updateStencil(entity);
@@ -187,8 +181,8 @@ namespace Fem
 
         gradients_.resize( size );
 
-        const auto end = gridPart_.template end< 0, Dune::Interior_Partition >();
-        for( auto it = gridPart_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
+        const auto end = gridView_.template end< 0, Dune::Interior_Partition >();
+        for( auto it = gridView_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
         {
           const auto& entity = *it ;
           const unsigned int entityIndex = dofMapper_.index( entity );
@@ -204,30 +198,30 @@ namespace Fem
         // helper class for evaluation of average value of discrete function
         EvalAverage average( U, dofMapper_ );
 
-        const auto end = gridPart_.template end< 0, Dune::Interior_Partition >();
-        for( auto it = gridPart_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
+        const auto end = gridView_.template end< 0, Dune::Interior_Partition >();
+        for( auto it = gridView_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
         {
           const auto& entity = *it ;
           const unsigned int entityIndex = dofMapper_.index( entity );
           average.evaluate( entity, values_[ entityIndex ] );
         }
 
-        lsRecon_( gridPart_.indexSet(), elemCtx, values_, gradients_, factor_, recompute );
+        lsRecon_( gridView_.indexSet(), elemCtx, values_, gradients_, factor_, recompute );
       }
       else if( schemeId == secondLP )
       {
         // helper class for evaluation of average value of discrete function
         EvalAverage average( U, dofMapper_ );
 
-        const auto end = gridPart_.template end< 0, Dune::Interior_Partition >();
-        for( auto it = gridPart_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
+        const auto end = gridView_.template end< 0, Dune::Interior_Partition >();
+        for( auto it = gridView_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
         {
           const auto& entity = *it ;
           const unsigned int entityIndex = dofMapper_.index( entity );
           average.evaluate( entity, values_[ entityIndex ] );
         }
 
-        linProg_( gridPart_.indexSet(), elemCtx, values_, gradients_ ); //, factor_, reco);
+        linProg_( gridView_.indexSet(), elemCtx, values_, gradients_ ); //, factor_, reco);
        //   std::cout << " gradients " << size << std::endl;
       }
       /*
@@ -237,15 +231,15 @@ namespace Fem
         // helper class for evaluation of average value of discrete function
         EvalAverage average( U, dofMapper_ );
 
-        const auto end = gridPart_.template end< 0, Dune::Interior_Partition >();
-        for( auto it = gridPart_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
+        const auto end = gridView_.template end< 0, Dune::Interior_Partition >();
+        for( auto it = gridView_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
         {
           const auto& entity = *it ;
           const unsigned int entityIndex = dofMapper_.index( entity );
           average.evaluate( entity, values_[ entityIndex ] );
         }
 
-        quadProg_( gridPart_.indexSet(), values_, gradients_ ); //, factor_, reco);
+        quadProg_( gridView_.indexSet(), values_, gradients_ ); //, factor_, reco);
 #else
         std::cerr << "dune-optim needed for quadratic programming reconstruction" << std::endl;
         std::abort();
@@ -265,8 +259,8 @@ namespace Fem
           for( size_t i = 0; i<size; ++i ) numbers_[ i ].clear();
         }
 
-        const auto end = gridPart_.template end< 0, Dune::Interior_Partition >();
-        for( auto it = gridPart_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
+        const auto end = gridView_.template end< 0, Dune::Interior_Partition >();
+        for( auto it = gridView_.template begin< 0, Dune::Interior_Partition >(); it != end; ++it )
         {
           //applyLocal( *it, U, recompute );
         }
@@ -346,7 +340,6 @@ namespace Fem
     void applyLocal(const std::map<size_t, size_t>& globalToLocal, const ElementContext& elemCtx, const unsigned int entityIndex,
                     std::vector<Evaluation> values, FieldVector<Evaluation, dimDomain> gradient, Evaluation factor, Evaluation number, const bool recompute )
     {
-
       // helper class for evaluation of average value of discrete function
       //EvalAverage average( U, dofMapper_ );
       // get geometry
@@ -373,7 +366,7 @@ namespace Fem
       std::vector< RangeType >  nbValsFull;
 
       // setup neighbors barycenter and mean value for all neighbors
-      LimiterUtilityType::setupNeighborValues( globalToLocal, gridPart_, elemCtx, entityIndex, values, entityCenter, values[ entityIndex ],
+      LimiterUtilityType::setupNeighborValues( globalToLocal, gridView_, elemCtx, entityIndex, values, entityCenter, values[ entityIndex ],
                                                centers_, StructuredGrid, flags, barys_, nbVals_, barysFull, nbValsFull);
 
       // mark entity as finished, even if not limited everything necessary was done
@@ -534,7 +527,8 @@ namespace Fem
       void evaluate( const LocalPoint& local, RangeType& value ) const
       {
         // compute point of evaluation
-        DomainType x = geometry_.global( Fem::coordinate( local ) );
+        // DomainType x = geometry_.global( Fem::coordinate( local ) );
+        DomainType x = geometry_.global( local );
         evaluateGlobal( x, value );
       }
 
@@ -649,7 +643,7 @@ namespace Fem
       std::vector< RangeType >  nbValsFull;
 
       // setup neighbors barycenter and mean value for all neighbors
-      LimiterUtilityType::setupNeighborValues( gridPart_, entity, average, entityCenter, values_[ entityIndex ],
+      LimiterUtilityType::setupNeighborValues( gridView_, entity, average, entityCenter, values_[ entityIndex ],
                                                centers_, StructuredGrid, flags, barys_, nbVals_, barysFull, nbValsFull);
 
       // mark entity as finished, even if not limited everything necessary was done
@@ -722,7 +716,7 @@ namespace Fem
     //! return local reconstruction
     LocalFunctionType localFunction( const EntityType& entity )
     {
-      const unsigned int entityIndex = gridPart_.indexSet().index( entity );
+      const unsigned int entityIndex = gridView_.indexSet().index( entity );
       return LocalFunctionType( entity, centers_[ entityIndex ],
                                 values_[ entityIndex ], gradients_[ entityIndex ] );
     }
@@ -730,7 +724,7 @@ namespace Fem
     //! return local reconstruction
     const LocalFunctionType localFunction( const EntityType& entity ) const
     {
-      const unsigned int entityIndex = gridPart_.indexSet().index( entity );
+      const unsigned int entityIndex = gridView_.indexSet().index( entity );
       return LocalFunctionType( entity, centers_[ entityIndex ],
                                 values_[ entityIndex ], gradients_[ entityIndex ] );
     }
@@ -748,7 +742,7 @@ namespace Fem
                                                 const size_t focusIdx,
                                                 const size_t newFocusIdx ) const
     {
-      const unsigned int entityIndex = gridPart_.indexSet().index( entity );
+      const unsigned int entityIndex = gridView_.indexSet().index( entity );
 
       size_t gradientIndex = elemCounter_[ entityIndex ] + newFocusIdx;
       // when upstream is not focus the derivatives need to be removed
@@ -826,7 +820,7 @@ namespace Fem
 
     }
 
-    const GridPartType&     gridPart_;
+    const GridViewType&     gridView_;
     const DofMapper&        dofMapper_;
 
     const LSRecon lsRecon_;

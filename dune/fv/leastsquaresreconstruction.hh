@@ -19,9 +19,6 @@
 
 #include <dune/fv/function/piecewiselinear.hh>
 
-//#include <fem-fv/limiterutility.hh>
-//#include <fem-fv/limitermodel.hh>
-
 namespace Dune
 {
 
@@ -42,7 +39,7 @@ namespace Dune
         static double getEpsilon()
         {
           // default value is 1e-8
-          return Dune::Fem::Parameter::getValue("femdg.limiter.limiteps", double(1e-8) );
+          return double(1e-8);
         }
 
         //! return epsilon for limiting
