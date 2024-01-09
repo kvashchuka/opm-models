@@ -267,7 +267,7 @@ SET_BOOL_PROP(FvBaseDiscretization, ExtensiveStorageTerm, false);
 // use volumetric residuals is default
 SET_BOOL_PROP(FvBaseDiscretization, UseVolumetricResidual, true);
 
-SET_BOOL_PROP(FvBaseDiscretization, EnableLocalReconstruction, false);
+SET_BOOL_PROP(FvBaseDiscretization, EnableLocalReconstruction, true);
 SET_BOOL_PROP(FvBaseDiscretization, ReconstructionSchemeId, 3); // 2 == least squares, 3 == LP
 
 //! eWoms is mainly targeted at research, so experimental features are enabled by
